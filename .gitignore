@@ -1,0 +1,33 @@
+# ── Credenciais e configuração local ─────────────────────────────────────────
+.env
+*.env.local
+.claude/
+
+# ── Ambiente Python ───────────────────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# ── Arquivos gerados em runtime ───────────────────────────────────────────────
+pending_changes.json
+
+# ── Relatórios gerados (regenerar via scripts/) ───────────────────────────────
+reports/
+
+# ── IDEs e editores ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Sistema operacional ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

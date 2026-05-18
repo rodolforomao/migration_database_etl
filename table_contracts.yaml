@@ -1,0 +1,11 @@
+# Contratos por tabela (schema relativo ao nome lógico da base no .env).
+# Regras suportadas:
+#   source_row_count_gte_target — antes da migração: COUNT(origem) >= COUNT(destino)
+#                                 (evita sincronizar um conjunto menor que o já existente no SUPRA).
+#
+# schema.table usa o schema no SQL Server (geralmente dbo).
+
+tables:
+  dbo.Dados_Medicao:
+    rules:
+      - source_row_count_gte_target

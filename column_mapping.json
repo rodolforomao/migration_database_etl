@@ -1,0 +1,2443 @@
+{
+  "_doc": "Mapeamento de colunas SUPRA (TB_SIAC_*) → SIMDNIT (Dados_*). Edite 'simdnit_col' para completar os links. null = coluna sem correspondência ainda conhecida. Colunas com simdnit_col=null são ignoradas no sync (SUPRA recebe NULL/default do banco).",
+  "_instrucoes": [
+    "1. Preencha 'simdnit_col' com o nome EXATO da coluna na tabela SIMDNIT indicada.",
+    "2. Marque 'enabled': false para excluir uma tabela ou coluna da sincronização.",
+    "3. Para habilitar tabelas DESABILITADAS: defina a estratégia de join e mude 'enabled' para true.",
+    "4. Execute 'python -m supra_db_update compare' para ver o efeito das alterações.",
+    "5. Execute 'python -m supra_db_update sync' para sincronizar."
+  ],
+  "scope": {
+    "sg_und_gestora": "CGCONT",
+    "description": "Contratos geridos pela CGCONT no SIMDNIT (configurável via SIMDNIT_SCOPE_SG_UND_GESTORA no .env)",
+    "excluded_contracts": [],
+    "_excluded_contracts_doc": "Contratos globalmente protegidos — não serão alterados em NENHUMA tabela. Ex.: [\"00 00799/2025\", \"00 01234/2024\"]",
+    "ignored_tables": [
+      "dbo.TB_SIAC_MEDICAO_MENOR",
+      "dbo.TB_SIAC_RODOVIA",
+      "dbo.TB_SIAC_SUPERVISORA",
+      "dbo.TB_SIAC_UFBR",
+      "dbo.TB_SIAC_VALOR"
+    ],
+    "_ignored_tables_doc": "Tabelas sem dados (ou fora do escopo) — ignoradas em compare, navigate e apply. Adicione nomes no formato 'dbo.NOME_TABELA'."
+  },
+  "tables": [
+    {
+      "enabled": false,
+      "supra": "dbo.TB_SIAC_CONSULTA_SITUACAO_OBRA_SERVICO",
+      "simdnit": "dbo.TB_CONSULTA_SITUACAO_OBRA_SERVICO",
+      "comment": "Tabela fora do escopo de sincronização automática (SIMDNIT não tem coluna de contrato ligada a Dados_Contrato). Defina a estratégia manualmente antes de habilitar.",
+      "columns": [
+        {
+          "enabled": true,
+          "supra_col": "CO_SITUACAO_OBRA",
+          "supra_type": "bigint",
+          "simdnit_col": "CO_SITUACAO_OBRA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "DESC_SITUACAO_OBRA",
+          "supra_type": "nvarchar",
+          "simdnit_col": "DESC_SITUACAO_OBRA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "CO_CONTRATO",
+          "supra_type": "bigint",
+          "simdnit_col": "CO_CONTRATO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "NU_CON_CONTRATO",
+          "supra_type": "nvarchar",
+          "simdnit_col": "NU_CON_CONTRATO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "NU_ORDEM",
+          "supra_type": "bigint",
+          "simdnit_col": "NU_ORDEM",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "NUMERO_SEI_DO_OFICIO",
+          "supra_type": "bigint",
+          "simdnit_col": "NUMERO_SEI_DO_OFICIO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "DT_ASSINATURA",
+          "supra_type": "datetime2",
+          "simdnit_col": "DT_ASSINATURA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "DT_SITUACAO",
+          "supra_type": "datetime2",
+          "simdnit_col": "DT_SITUACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "DE_JUSTIFICATIVA",
+          "supra_type": "nvarchar",
+          "simdnit_col": "DE_JUSTIFICATIVA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "DATA_REGISTRO",
+          "supra_type": "datetime2",
+          "simdnit_col": "DATA_REGISTRO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "DATA_CARGA",
+          "supra_type": "datetime2",
+          "simdnit_col": "DATA_CARGA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "CO_USUARIO",
+          "supra_type": "bigint",
+          "simdnit_col": "CO_USUARIO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "DESC_USUARIO",
+          "supra_type": "nvarchar",
+          "simdnit_col": "DESC_USUARIO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_CONTRATO",
+      "simdnit": "dbo.Dados_Contrato",
+      "comment": "3 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_siac_contrato",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "IDENTITY no SUPRA — não inserir"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "situacao_contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "DS_FAS_CONTRATO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "unidade_gestora",
+          "supra_type": "varchar",
+          "simdnit_col": "SG_UND_GESTORA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "num_processo",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_PROCESSO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "programa",
+          "supra_type": "varchar",
+          "simdnit_col": "NM_PROGRAMA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "tipo_contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "DS_TIP_CONTRATO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "num_edital",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_EDITAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "tipo_licitacao",
+          "supra_type": "varchar",
+          "simdnit_col": "TIPO_LICITACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "objeto_contratacao",
+          "supra_type": "varchar",
+          "simdnit_col": "DS_OBJETO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "empresa",
+          "supra_type": "varchar",
+          "simdnit_col": "NO_EMPRESA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "dt_base",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_BASE",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "dt_aprovacao",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_APROVACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "dt_assinatura",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_ASSINATURA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "dt_publicacao",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_PUBLICACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "dt_inicio",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_INICIO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "dt_termino_prevista",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_TER_PRV",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "dt_termino_atualizada",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_TER_ATZ",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "lote_contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_LOTE_LICITACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "trecho",
+          "supra_type": "varchar",
+          "simdnit_col": "=(SELECT STRING_AGG([DS_TRECHO], ' - ') WITHIN GROUP (ORDER BY [SK_SEGMENTO]) FROM dbo.Dados_Segmento WHERE [NU_CON_FORMATADO] = {M}.[NU_CON_FORMATADO])",
+          "simdnit_type": "varchar",
+          "is_join_key": false,
+          "source": "manual",
+          "note": "agregação de segmentos via STRING_AGG"
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_inicial",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_INICIAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_reajuste",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_TOTAL_DE_REAJUSTE",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_empenho",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_EMPENHADO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "dt_atualizacao",
+          "supra_type": "datetime",
+          "simdnit_col": "=GETDATE()",
+          "simdnit_type": "datetime",
+          "is_join_key": false,
+          "source": "none",
+          "note": "carimbada com a data de execução da carga; excluída do diff"
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_total_empenho",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_EMPENHADO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": false,
+          "supra_col": "saldo_empenho",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_SALDO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": "100% NULL no SUPRA produção — campo calculado por outro processo"
+        },
+        {
+          "enabled": true,
+          "supra_col": "uf_unidade_local",
+          "supra_type": "varchar",
+          "simdnit_col": "SG_UF_UNIDADE_LOCAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "unidade_local",
+          "supra_type": "varchar",
+          "simdnit_col": "SG_UND_LOCAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "tipo_intervencao",
+          "supra_type": "varchar",
+          "simdnit_col": "ds_tip_intervencao",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "cnpj_cpf_empresa",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CNPJ_CPF",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato_supervisao",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO_SUPERVISOR",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "dt_proposta",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_PROPOSTA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "qtd_dias_paralisados",
+          "supra_type": "int",
+          "simdnit_col": "NU_DIA_PARALISACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "qtd_dias_prorrogacao",
+          "supra_type": "int",
+          "simdnit_col": "NU_DIA_PRORROGACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "extensao_total",
+          "supra_type": "int",
+          "simdnit_col": "Extensao_Total",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_total_aditivo",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_TOTAL_DE_ADITIVOS",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_total_reajuste",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_TOTAL_DE_REAJUSTE",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_inicial_aditivo_reajuste",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_INICIAL_ADIT_REAJUSTES",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_saldo",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_SALDO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_medicao_pi_mais_r",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_MEDICAO_PI_R",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_pi_medicao",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_PI_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "vr_reajuste_medicao",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_REAJUSTE_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "modalidade",
+          "supra_type": "varchar",
+          "simdnit_col": "MODALIDADE_LICITACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "dt_termino_vigencia",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_TERMINO_VIGENCIA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": "",
+          "null_if": "1900-01-01"
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": false,
+      "supra": "dbo.TB_SIAC_CONTRATO_SUPERVISORA",
+      "simdnit": "dbo.Dados_Contrato_Supervisor_Supervisonado",
+      "comment": "Tabela fora do escopo de sincronização automática (SIMDNIT não tem coluna de contrato ligada a Dados_Contrato). Defina a estratégia manualmente antes de habilitar.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_siac_contrato_supervisora",
+          "supra_type": "bigint",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "nvarchar",
+          "simdnit_col": "Contrato_Supervisonado",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": false,
+          "supra_col": "situacao_contrato",
+          "supra_type": "nvarchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato_supervisora",
+          "supra_type": "nvarchar",
+          "simdnit_col": "Contrato_Supervisor",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "supervisora",
+          "supra_type": "nvarchar",
+          "simdnit_col": "Lista_Empresas_Supervisoras",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": false,
+      "supra": "dbo.TB_SIAC_CONVENIO_CONTRATO",
+      "simdnit": "dbo.Dados_Convenio",
+      "comment": "Tabela fora do escopo de sincronização automática (SIMDNIT não tem coluna de contrato ligada a Dados_Contrato). Defina a estratégia manualmente antes de habilitar.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_convenio_contrato",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "situacao_contrato",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "unidade_gestora",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "num_processo",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "programa",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "tipo_contrato",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "num_edital",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "tipo_licitacao",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "objeto_contratacao",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "empresa",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "dt_base",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "dt_aprovacao",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "dt_assinatura",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "dt_publicacao",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "dt_inicio",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "dt_termino_prevista",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "dt_termino_atualizada",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "lote_contrato",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "trecho",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_inicial",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_reajuste",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_empenho",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "dt_atualizacao",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_total_empenho",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "saldo_empenho",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "uf_unidade_local",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "unidade_local",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "tipo_intervencao",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "cnpj_cpf_empresa",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "contrato_supervisao",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "dt_proposta",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "qtd_dias_paralisados",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "qtd_dias_prorrogacao",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "extensao_total",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_total_aditivo",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_total_reajuste",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_inicial_aditivo_reajuste",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_saldo",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_medicao_pi_mais_r",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_pi_medicao",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "vr_reajuste_medicao",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "modalidade",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "dt_termino_vigencia",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "valor_pi_dnit",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "valor_pi_contrapartida",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "total_convenio",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "numero_siafi",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "valor_aditivo_dnit",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "total_dnit",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "valor_aditivo_contrapartida",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "total_contrapartida",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "total_convenio_atualizado",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_EMPENHO",
+      "simdnit": "dbo.Dados_Empenho",
+      "comment": "mapeamento manual concluído — data_emissao_empenho pendente (DT_DIA vs DT_CORRENTE)",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_siac_empenho",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "nota_empenho",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_EMPENHO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "data_emissao_empenho",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_DIA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_empenho_inicial",
+          "supra_type": "float",
+          "simdnit_col": "VL_EMPENHO_INICIAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_empenho_ajuste",
+          "supra_type": "float",
+          "simdnit_col": "VL_EMPENHO_AJUSTES",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_empenho_consumido",
+          "supra_type": "float",
+          "simdnit_col": "VL_EMPENHO_CONSUMIDO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_empenho_saldo",
+          "supra_type": "float",
+          "simdnit_col": "VL_EMPENHO_SALDO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+      "simdnit": "dbo.Dados_Empenho",
+      "comment": "9 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": true,
+          "supra_col": "Contrato",
+          "supra_type": "nvarchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": false,
+          "supra_col": "Nota_de_Empenho",
+          "supra_type": "nvarchar",
+          "simdnit_col": "NU_EMPENHO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "Data_Emiss_o_Empenho",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_DIA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "Valor_Empenho_Inicial",
+          "supra_type": "money",
+          "simdnit_col": "VL_EMPENHO_INICIAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "Valor_Empenho_Ajustes",
+          "supra_type": "money",
+          "simdnit_col": "VL_EMPENHO_AJUSTES",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "Valor_Empenho_Consumido",
+          "supra_type": "money",
+          "simdnit_col": "VL_EMPENHO_CONSUMIDO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": false,
+          "supra_col": "Valor_Empenho_Saldo",
+          "supra_type": "money",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "id_usuario",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "ultima_atualizacao",
+          "supra_type": "datetime",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]",
+      "extra_joins": [
+        {
+          "simdnit_table": "dbo.Dados_Oficio_Pagamento",
+          "on": {
+            "main_col": "NU_EMPENHO",
+            "join_col": "NU_EMPENHO"
+          },
+          "columns": [
+            {
+              "supra_col": "N_mero_do_Documento",
+              "simdnit_col": "CONTA_CORRENTE",
+              "enabled": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_EMPENHO_ORG",
+      "simdnit": "dbo.Dados_Empenho",
+      "comment": "7 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_siac_empenho",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "nota_empenho",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_EMPENHO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "data_emissao_empenho",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_DIA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_empenho_inicial",
+          "supra_type": "float",
+          "simdnit_col": "VL_EMPENHO_INICIAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_empenho_ajuste",
+          "supra_type": "float",
+          "simdnit_col": "VL_EMPENHO_AJUSTES",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_empenho_consumido",
+          "supra_type": "float",
+          "simdnit_col": "VL_EMPENHO_CONSUMIDO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": false,
+          "supra_col": "valor_empenho_saldo",
+          "supra_type": "float",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_FINANCEIRO",
+      "simdnit": "dbo.Dados_Contrato",
+      "comment": "8 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_siac_financeiro",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_inicial",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_INICIAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_total_reajuste",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_TOTAL_DE_REAJUSTE",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_total_aditivo",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_TOTAL_DE_ADITIVOS",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_inicial_aditivo",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_INICIAL_ADIT_REAJUSTES - VALOR_TOTAL_DE_REAJUSTE",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": "formula: Regra especial: valor_inicial_aditivo = VALOR_INICIAL_ADIT_REAJUSTES - VALOR_TOTAL_DE_REAJUSTE"
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_inicial_aditivo_reajuste",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_INICIAL_ADIT_REAJUSTES",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_empenhado",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_MEDICAO_PI_R",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_saldo",
+          "supra_type": "float",
+          "simdnit_col": "VALOR_SALDO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_FISCAL_CONTRATO",
+      "simdnit": "dbo.Dados_Fiscais_Contrato",
+      "comment": "4 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_fiscal_contrato",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "fiscal_titular",
+          "supra_type": "varchar",
+          "simdnit_col": "NM_FISCAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "cpf_titular",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CPF",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "telefone_titular",
+          "supra_type": "varchar",
+          "simdnit_col": "TEL_FISCAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "email_titular",
+          "supra_type": "varchar",
+          "simdnit_col": "EMAIL_FISCAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "unidade_lotacao_titular",
+          "supra_type": "varchar",
+          "simdnit_col": "NM_UND_LOTACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "fiscal_substituto",
+          "supra_type": "varchar",
+          "simdnit_col": "CustCol_48",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "cpf_substituto",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CPF_SUB",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "unidade_lotacao_substituto",
+          "supra_type": "varchar",
+          "simdnit_col": "NM_UND_LOTACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_MEDICAO_MAIOR",
+      "simdnit": "dbo.Dados_Medicao",
+      "comment": "4 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "nume_medicao",
+          "supra_type": "int",
+          "simdnit_col": "NU_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "data_termino_medicao",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_TERMINO_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "data_processamento_medicao",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_PROCESSAMENTO_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_pi_medicao",
+          "supra_type": "float",
+          "simdnit_col": "VL_PI_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_reajuste_medicao",
+          "supra_type": "float",
+          "simdnit_col": "VL_PI_R_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+      "simdnit": "dbo.Dados_Medicao",
+      "comment": "5 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "nume_medicao",
+          "supra_type": "int",
+          "simdnit_col": "NU_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "data_termino_medicao",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_TERMINO_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "data_processamento_medicao",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_PROCESSAMENTO_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_pi_medicao",
+          "supra_type": "float",
+          "simdnit_col": "VL_PI_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_reajuste_medicao",
+          "supra_type": "float",
+          "simdnit_col": "VL_REA_MEDICAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_MEDICAO_MENOR",
+      "simdnit": "dbo.Dados_Hist_Medicoes",
+      "comment": "6 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_siac_medicao_menor",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": false,
+          "supra_col": "nume_medicao",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "data_termino_medicao",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "data_processamento_medicao",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "valor_pi_medicao",
+          "supra_type": "money",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "valor_reajuste_medicao",
+          "supra_type": "money",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_REAJUSTE",
+      "simdnit": "dbo.Dados_Reajuste",
+      "comment": "",
+      "columns": [
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "Contrato",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "data_da_assinatura_do_reajuste",
+          "supra_type": "nvarchar",
+          "simdnit_col": "Data_da_Assinatura_do_Reajuste",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "numero_do_reajuste",
+          "supra_type": "float",
+          "simdnit_col": "Numero_do_Reajuste",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_do_reajuste",
+          "supra_type": "float",
+          "simdnit_col": "Valor_do_Reajuste",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": false,
+      "supra": "dbo.TB_SIAC_RODOVIA",
+      "simdnit": "dbo.Dados_Segmento",
+      "comment": "8 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_siac_rodovia",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": false,
+          "supra_col": "uf_unidade_local",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "rodovia",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "seg_km_inicial",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "seg_km_final",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "trecho",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "pnv_inicial",
+          "supra_type": "varchar",
+          "simdnit_col": "pnv_inicial",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "pnv_final",
+          "supra_type": "varchar",
+          "simdnit_col": "pnv_final",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "homonym",
+          "note": ""
+        },
+        {
+          "enabled": false,
+          "supra_col": "pnv_km_inicial",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "pnv_km_final",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_SEGMENTO",
+      "simdnit": "dbo.Dados_Segmento",
+      "comment": "6 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_siac_segmento",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "estado_segmento",
+          "supra_type": "varchar",
+          "simdnit_col": "NM_ESTADO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "rodovia",
+          "supra_type": "varchar",
+          "simdnit_col": "SG_RODOVIA",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "inferred",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "km_inicial",
+          "supra_type": "float",
+          "simdnit_col": "NU_KM_INICIAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "km_final",
+          "supra_type": "float",
+          "simdnit_col": "NU_KM_FINAL",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "extensao_segmento",
+          "supra_type": "float",
+          "simdnit_col": "NU_EXT_SEG",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "ultima_alteracao",
+          "supra_type": "datetime",
+          "simdnit_col": "=GETDATE()",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "carimbada com a data de execução da carga; excluída do diff"
+        },
+        {
+          "enabled": true,
+          "supra_col": "trecho",
+          "supra_type": "varchar",
+          "simdnit_col": "DS_TRECHO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": false,
+      "supra": "dbo.TB_SIAC_SUPERVISORA",
+      "simdnit": "dbo.Dados_Contrato_Supervisor_Supervisonado",
+      "comment": "Tabela fora do escopo de sincronização automática (SIMDNIT não tem coluna de contrato ligada a Dados_Contrato). Defina a estratégia manualmente antes de habilitar.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_siac_supervisora",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "co_contrato",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "objeto",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "tipo_contrato",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "co_contrato_sup",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "contrato_sup",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "contato_sup",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "objeto_sup",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "tipo_contrato_sup",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": false,
+          "supra_col": "supervisora",
+          "supra_type": "varchar",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    },
+    {
+      "enabled": true,
+      "supra": "dbo.TB_SIAC_TERMO_ADITIVO",
+      "simdnit": "dbo.Dados_Aditivo",
+      "comment": "8 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
+      "columns": [
+        {
+          "enabled": false,
+          "supra_col": "id_termo_aditivo",
+          "supra_type": "int",
+          "simdnit_col": null,
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "none",
+          "note": "sem mapeamento no CSV"
+        },
+        {
+          "enabled": true,
+          "supra_col": "contrato",
+          "supra_type": "varchar",
+          "simdnit_col": "NU_CON_FORMATADO",
+          "simdnit_type": null,
+          "is_join_key": true,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "numero_aditivo",
+          "supra_type": "int",
+          "simdnit_col": "NU_ADITIVO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "objeto_aditivo",
+          "supra_type": "varchar",
+          "simdnit_col": "DS_OBJETO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "data_assinatura_aditivo",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_ASSINATURA0",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "qtd_dias_prorrogacao",
+          "supra_type": "int",
+          "simdnit_col": "NU_DIA_PRORROGACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "semantic",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "valor_aditivo",
+          "supra_type": "float",
+          "simdnit_col": "VL_ADITIVO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "motivo_paralisacao",
+          "supra_type": "varchar",
+          "simdnit_col": "DS_MOTIVO_PARALISACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "data_reinicio",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_ASSINATURA0",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        },
+        {
+          "enabled": true,
+          "supra_col": "data_paralisacao",
+          "supra_type": "datetime",
+          "simdnit_col": "DT_PARALISACAO",
+          "simdnit_type": null,
+          "is_join_key": false,
+          "source": "manual",
+          "note": ""
+        }
+      ],
+      "protected_contracts": [],
+      "_protected_contracts_doc": "Contratos protegidos nesta tabela específica. Ex.: [\"00 00799/2025\"]"
+    }
+  ]
+}
