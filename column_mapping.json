@@ -1589,7 +1589,7 @@
           "enabled": true,
           "supra_col": "valor_empenhado",
           "supra_type": "float",
-          "simdnit_col": "VALOR_MEDICAO_PI_R",
+          "simdnit_col": "VALOR_EMPENHADO",
           "simdnit_type": null,
           "is_join_key": false,
           "source": "manual",
