@@ -220,6 +220,7 @@ class TableDiff:
     supra_total: int
     by_contract: list[ContractDiff] = field(default_factory=list)
     error: str = ""
+    warning: str = ""  # escopo vazio — comparação não realizada
 
     # ── totais por ação (apenas contratos activos, não protegidos) ──────────
 
@@ -254,6 +255,8 @@ class TableDiff:
     def status_label(self) -> str:
         if self.error:
             return f"ERRO: {self.error[:60]}"
+        if self.warning:
+            return f"AVISO: {self.warning[:80]}"
         if not self.needs_sync:
             prot = len(self.protected_changed)
             suffix = f"  [{prot} protegido(s) ignorado(s)]" if prot else ""
@@ -402,7 +405,28 @@ def compare_table(
         managed = list(sim_cnt.keys())
 
         if not managed:
-            return TableDiff(pair=pair, simdnit_total=0, supra_total=0)
+            if pair.simdnit_table.lower() == _DADOS_CONTRATO:
+                # tabela raiz: podemos contar o SUPRA diretamente
+                dst_cur.execute(f"SELECT COUNT(*) FROM {pair.supra_table}")
+                supra_total = int(dst_cur.fetchone()[0])
+                msg = (
+                    f"Dados_Contrato vazia (SG={sg!r}). "
+                    f"SUPRA tem {supra_total:,} linha(s) — escopo SIMDNIT inexistente."
+                )
+            else:
+                # tabela filha: escopo depende de Dados_Contrato; sem contratos não
+                # podemos afirmar nada sobre o SUPRA — não executamos COUNT sem filtro
+                supra_total = 0
+                msg = (
+                    f"Escopo vazio (SG={sg!r}) — depende de Dados_Contrato. "
+                    "Estado do SUPRA não verificado."
+                )
+            return TableDiff(
+                pair=pair,
+                simdnit_total=0,
+                supra_total=supra_total,
+                warning=msg,
+            )
 
         supra_cnt = _count_per_contract_supra(dst_cur, pair, managed)
 

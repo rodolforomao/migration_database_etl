@@ -91,7 +91,7 @@ python -m supra_db_update sync                               # interativo: compa
 python -m supra_db_update sync dbo.TB_SIAC_CONTRATO          # tabela específica
 python -m supra_db_update sync --dry-run                     # simulação segura (não altera nada)
 python -m supra_db_update sync --force --yes                 # todos os contratos CGCONT sem prompt
-python -m supra_db_update sync --force --yes --batch-size 1000
+python -m supra_db_update sync --force --yes --batch-size 5000
 python -m supra_db_update sync --deep                        # usa checksum
 
 

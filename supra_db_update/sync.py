@@ -281,8 +281,29 @@ def cmd_compare(
 
                 needs = [d for d in diffs if d.needs_sync]
                 errors = [d for d in diffs if d.error]
-                print(f"\nTabelas OK: {len(diffs) - len(needs) - len(errors)}")
+                warns = [d for d in diffs if d.warning]
+                n_ok = len(diffs) - len(needs) - len(errors) - len(warns)
+                print(f"\nTabelas OK: {n_ok}")
                 print(f"Tabelas com diferença: {len(needs)}")
+                if warns:
+                    print(f"Tabelas com aviso (escopo vazio): {len(warns)}")
+                    exit_code = 1
+
+                # causa-raiz: Dados_Contrato vazia impede comparar as filhas
+                dados_contrato_diff = next(
+                    (d for d in warns if d.pair.simdnit_table.lower() == "dbo.dados_contrato"),
+                    None,
+                )
+                if dados_contrato_diff:
+                    supra_n = dados_contrato_diff.supra_total
+                    print(
+                        f"\n[CAUSA RAIZ] dbo.Dados_Contrato está vazia para SG={sg!r}.\n"
+                        f"  SUPRA tem {supra_n:,} linha(s) em TB_SIAC_CONTRATO.\n"
+                        "  As demais tabelas dependem de Dados_Contrato para filtrar contratos\n"
+                        "  e não foram comparadas — seus valores no SUPRA são desconhecidos.\n"
+                        "  Repopule dbo.Dados_Contrato e execute novamente."
+                    )
+
                 if errors:
                     print(f"Tabelas com erro: {len(errors)}")
                     exit_code = 1
