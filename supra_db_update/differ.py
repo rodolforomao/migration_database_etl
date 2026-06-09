@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 
-import pyodbc
+import pymssql
 
 from supra_db_update.table_map import TablePair, _br, _sql_expr
 
@@ -13,6 +14,35 @@ log = logging.getLogger(__name__)
 
 _CHUNK = 900
 _DADOS_CONTRATO = "dbo.dados_contrato"
+
+
+def _norm_val(v):
+    """
+    Normaliza valores numéricos para comparação de sets entre bases.
+
+    SIMDNIT usa FLOAT  → pymssql retorna Python float  (ex.: 1831200.2)
+    SUPRA usa MONEY    → pymssql retorna Python Decimal (ex.: Decimal('1831200.2000'))
+
+    Sem normalização, float(1831200.2) != Decimal('1831200.2000') em set comparison,
+    fazendo linhas idênticas aparecerem como "diferentes".
+    """
+    if v is None:
+        return v
+    if isinstance(v, Decimal):
+        try:
+            return v.normalize()          # Decimal('1831200.2000') → Decimal('1.8312002E+6')
+        except InvalidOperation:
+            return v
+    if isinstance(v, float):
+        try:
+            return Decimal(str(v)).normalize()   # float → mesmo canonical que Decimal acima
+        except InvalidOperation:
+            return v
+    return v
+
+
+def _norm_row(row: tuple) -> tuple:
+    return tuple(_norm_val(v) for v in row)
 
 
 def _build_scope_where(pair: TablePair, sg: str, table_prefix: str = "") -> tuple[str, tuple]:
@@ -31,9 +61,9 @@ def _build_scope_where(pair: TablePair, sg: str, table_prefix: str = "") -> tupl
     p = f"{table_prefix}." if table_prefix else ""
     jcol = f"{p}{_br(pair.join_simdnit)}"
     if pair.simdnit_table.lower() == _DADOS_CONTRATO:
-        return f"{p}[SG_UND_GESTORA] = ?", (sg,)
+        return f"{p}[SG_UND_GESTORA] = %s", (sg,)
     return (
-        f"{jcol} IN (SELECT NU_CON_FORMATADO FROM dbo.Dados_Contrato WHERE SG_UND_GESTORA = ?)",
+        f"{jcol} IN (SELECT NU_CON_FORMATADO FROM dbo.Dados_Contrato WHERE SG_UND_GESTORA = %s)",
         (sg,),
     )
 
@@ -55,8 +85,8 @@ class RowDiff:
 
 
 def diff_rows_for_contract(
-    src_cur: pyodbc.Cursor,
-    dst_cur: pyodbc.Cursor,
+    src_cur: pymssql.Cursor,
+    dst_cur: pymssql.Cursor,
     pair: TablePair,
     contract: str,
     sg: str,
@@ -83,12 +113,12 @@ def diff_rows_for_contract(
             where_scope, scope_params = _build_scope_where(pair, sg)
             jcol_sim = _br(pair.join_simdnit)
             src_cur.execute(
-                f"SELECT COUNT(*) FROM {pair.simdnit_table} WHERE {jcol_sim} = ? AND {where_scope}",
+                f"SELECT COUNT(*) FROM {pair.simdnit_table} WHERE {jcol_sim} = %s AND {where_scope}",
                 (contract, *scope_params),
             )
             sim_count = src_cur.fetchone()[0]
             dst_cur.execute(
-                f"SELECT COUNT(*) FROM {pair.supra_table} WHERE {jcol_supra} = ?",
+                f"SELECT COUNT(*) FROM {pair.supra_table} WHERE {jcol_supra} = %s",
                 (contract,),
             )
             supra_count = dst_cur.fetchone()[0]
@@ -132,7 +162,7 @@ def diff_rows_for_contract(
             from_sim = pair.simdnit_table
 
         src_cur.execute(
-            f"SELECT {all_sim_cols} FROM {from_sim} WHERE {sim_jcol} = ? AND {where_scope}",
+            f"SELECT {all_sim_cols} FROM {from_sim} WHERE {sim_jcol} = %s AND {where_scope}",
             (contract, *scope_params),
         )
         sim_rows: set[tuple] = {tuple(r) for r in src_cur.fetchall()}
@@ -141,7 +171,7 @@ def diff_rows_for_contract(
         supra_col_exprs = [_br(p.supra) for p in data_pairs] + [_br(sc) for (sc, _, _) in ej_cols]
         col_list_supra = ", ".join(supra_col_exprs)
         dst_cur.execute(
-            f"SELECT {col_list_supra} FROM {pair.supra_table} WHERE {jcol_supra} = ?",
+            f"SELECT {col_list_supra} FROM {pair.supra_table} WHERE {jcol_supra} = %s",
             (contract,),
         )
         supra_rows: set[tuple] = {tuple(r) for r in dst_cur.fetchall()}
@@ -151,13 +181,36 @@ def diff_rows_for_contract(
         def _sort_key(r: tuple) -> list:
             return [str(v) if v is not None else "" for v in r]
 
+        # ── 1ª passagem: comparação exata (comportamento original) ───────────
+        added_raw  = sim_rows  - supra_rows   # apenas em SIMDNIT
+        removed_raw = supra_rows - sim_rows   # apenas em SUPRA
+        common_exact = len(sim_rows & supra_rows)
+
+        # ── 2ª passagem: filtra "fantasmas" de precisão numérica ─────────────
+        # SIMDNIT usa FLOAT, SUPRA usa MONEY/DECIMAL → mesmo número, tipos Python diferentes.
+        # Antes de marcar como mudança, re-verifica com valores normalizados.
+        if added_raw or removed_raw:
+            supra_norm = {_norm_row(r) for r in supra_rows}
+            sim_norm   = {_norm_row(r) for r in sim_rows}
+
+            # mantém só os que continuam diferentes após normalização
+            added_real   = [r for r in added_raw   if _norm_row(r) not in supra_norm]
+            removed_real = [r for r in removed_raw if _norm_row(r) not in sim_norm]
+
+            # pares que eram "diferentes" só por precisão numérica → viram common
+            phantom = len(added_raw) - len(added_real)
+        else:
+            added_real   = []
+            removed_real = []
+            phantom      = 0
+
         return RowDiff(
             contract=contract,
             pair=pair,
             cols=all_col_names,
-            added=sorted(sim_rows - supra_rows, key=_sort_key),
-            removed=sorted(supra_rows - sim_rows, key=_sort_key),
-            common=len(sim_rows & supra_rows),
+            added=sorted(added_real,   key=_sort_key),
+            removed=sorted(removed_real, key=_sort_key),
+            common=common_exact + phantom,
         )
     except Exception as exc:
         return RowDiff(
@@ -273,7 +326,7 @@ class TableDiff:
 # ---------------------------------------------------------------------------
 
 def _count_per_contract_simdnit(
-    cur: pyodbc.Cursor, pair: TablePair, sg: str
+    cur: pymssql.Cursor, pair: TablePair, sg: str
 ) -> dict[str, int]:
     # quando há extra_joins, o COUNT precisa usar o mesmo JOIN que o sync usa,
     # pois o JOIN pode multiplicar linhas (ex.: Dados_Oficio_Pagamento)
@@ -306,12 +359,12 @@ def _count_per_contract_simdnit(
 
 
 def _count_per_contract_supra(
-    cur: pyodbc.Cursor, pair: TablePair, contracts: list[str]
+    cur: pymssql.Cursor, pair: TablePair, contracts: list[str]
 ) -> dict[str, int]:
     jcol = _br(pair.join_supra)
     result: dict[str, int] = {}
     for chunk in _chunks(contracts, _CHUNK):
-        ph = ", ".join(["?"] * len(chunk))
+        ph = ", ".join(["%s"] * len(chunk))
         sql = f"""
             SELECT {jcol}, COUNT(*) AS cnt
             FROM {pair.supra_table}
@@ -325,7 +378,7 @@ def _count_per_contract_supra(
 
 
 def _checksum_per_contract_simdnit(
-    cur: pyodbc.Cursor, pair: TablePair, sg: str
+    cur: pymssql.Cursor, pair: TablePair, sg: str
 ) -> dict[str, int]:
     real_pairs = [p for p in pair.pairs if not p.is_injected]
     if pair.extra_joins:
@@ -367,7 +420,7 @@ def _checksum_per_contract_simdnit(
 
 
 def _checksum_per_contract_supra(
-    cur: pyodbc.Cursor, pair: TablePair, contracts: list[str]
+    cur: pymssql.Cursor, pair: TablePair, contracts: list[str]
 ) -> dict[str, int]:
     jcol = _br(pair.join_supra)
     main_chk = [_br(p.supra) for p in pair.pairs if not p.is_injected]
@@ -375,7 +428,7 @@ def _checksum_per_contract_supra(
     chk_cols = ", ".join(main_chk + ej_chk)
     result: dict[str, int] = {}
     for chunk in _chunks(contracts, _CHUNK):
-        ph = ", ".join(["?"] * len(chunk))
+        ph = ", ".join(["%s"] * len(chunk))
         sql = f"""
             SELECT {jcol},
                    CHECKSUM_AGG(BINARY_CHECKSUM({chk_cols})) AS chk
@@ -394,8 +447,8 @@ def _checksum_per_contract_supra(
 # ---------------------------------------------------------------------------
 
 def compare_table(
-    src_cur: pyodbc.Cursor,
-    dst_cur: pyodbc.Cursor,
+    src_cur: pymssql.Cursor,
+    dst_cur: pymssql.Cursor,
     pair: TablePair,
     sg: str = "CGCONT",
     deep: bool = False,

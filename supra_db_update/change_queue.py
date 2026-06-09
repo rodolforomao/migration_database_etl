@@ -122,6 +122,13 @@ class ChangeSet:
     sg_und_gestora: str
     status: str = "pending"   # "pending" | "applied"
     tables: list[TableChange] = field(default_factory=list)
+    # cada entrada: {"ok": bool, "table": str, "message": str}
+    alerts: list[dict] = field(default_factory=list)
+
+    @property
+    def alerts_blocked(self) -> bool:
+        """True se algum alerta falhou (migração deve ser bloqueada)."""
+        return any(not a.get("ok", True) for a in self.alerts)
 
     # ── lookups ─────────────────────────────────────────────────────────────
 
@@ -194,6 +201,9 @@ def _table_to_dict(t: TableChange) -> dict:
 
 
 def save_changeset(cs: ChangeSet, path: Path = DEFAULT_PATH) -> None:
+    alerts_status = "not_run"
+    if cs.alerts:
+        alerts_status = "fail" if cs.alerts_blocked else "ok"
     data = {
         "_doc": (
             "Arquivo de alterações pendentes. "
@@ -204,6 +214,10 @@ def save_changeset(cs: ChangeSet, path: Path = DEFAULT_PATH) -> None:
         "target_label": cs.target_label,
         "sg_und_gestora": cs.sg_und_gestora,
         "status": cs.status,
+        "alerts": {
+            "status": alerts_status,
+            "results": cs.alerts,
+        },
         "tables": [_table_to_dict(t) for t in cs.tables],
     }
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -237,12 +251,15 @@ def load_changeset(path: Path = DEFAULT_PATH) -> ChangeSet:
                 contracts=contracts,
             )
         )
+    raw_alerts = raw.get("alerts") or {}
+    alerts = raw_alerts.get("results", []) if isinstance(raw_alerts, dict) else []
     return ChangeSet(
         generated_at=raw["generated_at"],
         target_label=raw["target_label"],
         sg_und_gestora=raw["sg_und_gestora"],
         status=raw.get("status", "pending"),
         tables=tables,
+        alerts=alerts,
     )
 
 

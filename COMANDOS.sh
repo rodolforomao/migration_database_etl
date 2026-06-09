@@ -14,7 +14,12 @@
 python -m supra_db_update test-connections
 
 
-# ── VALIDAÇÃO PRÉ-MIGRAÇÃO ───────────────────────────────────────────────────
+# ── ALERTAS DE SEGURANÇA PRÉ-MIGRAÇÃO (não altera dados) ────────────────────
+
+python -m supra_db_update alerts                     # executa todos os alertas configurados
+python -m supra_db_update alerts --contracts outro.yaml  # YAML alternativo
+
+# ── VALIDAÇÃO PRÉ-MIGRAÇÃO (legado) ──────────────────────────────────────────
 
 python -m supra_db_update validate dbo.Dados_Medicao
 

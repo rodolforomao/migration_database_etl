@@ -6,9 +6,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Callable
 
-import pyodbc
+import pymssql
 
-from supra_db_update.differ import _build_scope_where
+from supra_db_update.differ import _build_scope_where, _norm_row
 from supra_db_update.table_map import TablePair, _br, _sql_expr
 
 log = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class SyncResult:
 
 
 def _fetch_simdnit(
-    cur: pyodbc.Cursor,
+    cur: pymssql.Cursor,
     pair: TablePair,
     contracts: list[str],
     sg: str,
@@ -75,7 +75,7 @@ def _fetch_simdnit(
 
     rows: list[tuple] = []
     for chunk in _chunks(contracts, _CHUNK):
-        ph = ", ".join(["?"] * len(chunk))
+        ph = ", ".join(["%s"] * len(chunk))
         sql = f"""
             SELECT {all_cols}
             FROM {from_clause}
@@ -87,15 +87,37 @@ def _fetch_simdnit(
     return rows
 
 
+def _fetch_supra(
+    cur: pymssql.Cursor,
+    pair: TablePair,
+    contracts: list[str],
+) -> list[tuple]:
+    """Busca linhas atuais do SUPRA nas mesmas colunas que o INSERT usa."""
+    jcol = _br(pair.join_supra)
+    all_supra = [p.supra for p in pair.pairs]
+    for ej in pair.extra_joins:
+        all_supra.extend(ec.supra for ec in ej.columns)
+    col_list = ", ".join(_br(c) for c in all_supra)
+    rows: list[tuple] = []
+    for chunk in _chunks(contracts, _CHUNK):
+        ph = ", ".join(["%s"] * len(chunk))
+        cur.execute(
+            f"SELECT {col_list} FROM {pair.supra_table} WHERE {jcol} IN ({ph})",
+            chunk,
+        )
+        rows.extend(cur.fetchall())
+    return rows
+
+
 def _delete_supra(
-    cur: pyodbc.Cursor,
+    cur: pymssql.Cursor,
     pair: TablePair,
     contracts: list[str],
 ) -> int:
     jcol = _br(pair.join_supra)
     deleted = 0
     for chunk in _chunks(contracts, _CHUNK):
-        ph = ", ".join(["?"] * len(chunk))
+        ph = ", ".join(["%s"] * len(chunk))
         sql = f"DELETE FROM {pair.supra_table} WHERE {jcol} IN ({ph})"
         cur.execute(sql, chunk)
         deleted += cur.rowcount
@@ -107,12 +129,12 @@ def _build_insert_sql(pair: TablePair) -> str:
     for ej in pair.extra_joins:
         all_supra.extend(ec.supra for ec in ej.columns)
     cols = ", ".join(_br(c) for c in all_supra)
-    ph = ", ".join(["?"] * len(all_supra))
+    ph = ", ".join(["%s"] * len(all_supra))
     return f"INSERT INTO {pair.supra_table} ({cols}) VALUES ({ph})"
 
 
 def stamp_injected_cols(
-    dst_conn: pyodbc.Connection,
+    dst_conn: pymssql.Connection,
     pair: TablePair,
     all_contracts: list[str],
 ) -> int:
@@ -130,11 +152,11 @@ def stamp_injected_cols(
     set_clause = ", ".join(f"{_br(p.supra)} = {p.inject_expr}" for p in stamp_pairs)
     jcol = _br(pair.join_supra)
     dst_cur = dst_conn.cursor()
-    dst_conn.autocommit = False
+    dst_conn.autocommit(False)
     stamped = 0
     try:
         for chunk in _chunks(all_contracts, _CHUNK):
-            ph = ", ".join(["?"] * len(chunk))
+            ph = ", ".join(["%s"] * len(chunk))
             dst_cur.execute(
                 f"UPDATE {pair.supra_table} SET {set_clause} WHERE {jcol} IN ({ph})",
                 chunk,
@@ -145,15 +167,15 @@ def stamp_injected_cols(
         dst_conn.rollback()
         raise
     finally:
-        dst_conn.autocommit = True
+        dst_conn.autocommit(True)
         dst_cur.close()
 
     return stamped
 
 
 def sync_table(
-    src_conn: pyodbc.Connection,
-    dst_conn: pyodbc.Connection,
+    src_conn: pymssql.Connection,
+    dst_conn: pymssql.Connection,
     pair: TablePair,
     contracts: list[str],
     sg: str = "CGCONT",
@@ -178,23 +200,56 @@ def sync_table(
 
         # 1. busca dados do SIMDNIT
         log.info("  Buscando dados SIMDNIT: %s (%d contratos)...", pair.simdnit_table, len(contracts))
-        rows = _fetch_simdnit(src_cur, pair, contracts, sg)
+        sim_rows = _fetch_simdnit(src_cur, pair, contracts, sg)
 
-        if not rows:
+        if not sim_rows:
             log.info("  Nenhuma linha no SIMDNIT para esses contratos.")
             return result
 
-        # 2. DELETE no SUPRA (dentro de transação)
-        dst_conn.autocommit = False
-        try:
-            log.info("  Deletando linhas SUPRA: %s...", pair.supra_table)
-            result.deleted = _delete_supra(dst_cur, pair, contracts)
-            log.info("  %d linhas removidas.", result.deleted)
+        # 2. busca estado atual do SUPRA e decide a estratégia
+        supra_rows = _fetch_supra(dst_cur, pair, contracts)
 
-            # 3. INSERT em lotes
+        sim_norm = {_norm_row(tuple(r)) for r in sim_rows}
+        sup_norm = {_norm_row(tuple(r)) for r in supra_rows}
+
+        supra_only = sup_norm - sim_norm    # linhas no SUPRA que NÃO estão no SIMDNIT
+        simdnit_only_norm = sim_norm - sup_norm  # linhas no SIMDNIT que não estão no SUPRA
+
+        if not supra_only and not simdnit_only_norm:
+            # tudo idêntico após normalização — nada a fazer
+            log.info("  Sem alterações reais após verificação numérica. Nenhuma ação necessária.")
+            result.contracts_synced = contracts[:]
+            return result
+
+        if not supra_only:
+            # todas as linhas do SUPRA já existem no SIMDNIT — apenas INSERTs necessários
+            # (evita DELETE+reinsert de linhas que já estão corretas)
+            rows_to_insert = [r for r in sim_rows if _norm_row(tuple(r)) not in sup_norm]
+            contracts_to_delete: list[str] = []
+            log.info(
+                "  SUPRA é subconjunto do SIMDNIT — apenas %d INSERT(s), sem DELETE.",
+                len(rows_to_insert),
+            )
+        else:
+            # há linhas no SUPRA que não existem no SIMDNIT → refresh completo por segurança
+            rows_to_insert = sim_rows
+            contracts_to_delete = contracts
+            log.info(
+                "  %d linha(s) do SUPRA divergem → DELETE + INSERT completo.",
+                len(supra_only),
+            )
+
+        # 3. executa dentro de transação
+        dst_conn.autocommit(False)
+        try:
+            if contracts_to_delete:
+                log.info("  Deletando linhas SUPRA: %s...", pair.supra_table)
+                result.deleted = _delete_supra(dst_cur, pair, contracts_to_delete)
+                log.info("  %d linhas removidas.", result.deleted)
+
             ins_sql = _build_insert_sql(pair)
-            total = len(rows)
-            for i, batch in enumerate(_chunks(rows, batch_size)):
+            total = len(rows_to_insert)
+            for batch in _chunks(rows_to_insert, batch_size):
                 dst_cur.executemany(ins_sql, [tuple(r) for r in batch])
                 result.inserted += len(batch)
                 if progress_cb:
@@ -208,7 +263,7 @@ def sync_table(
             dst_conn.rollback()
             raise exc
         finally:
-            dst_conn.autocommit = True
+            dst_conn.autocommit(True)
 
     except Exception as exc:
         msg = str(exc)

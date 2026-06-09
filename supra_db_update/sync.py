@@ -7,7 +7,7 @@ import logging
 import sys
 from pathlib import Path
 
-import pyodbc
+import pymssql
 
 from supra_db_update.change_queue import (
     ChangeSet,
@@ -29,9 +29,11 @@ from supra_db_update.differ import ContractDiff, TableDiff, RowDiff, _build_scop
 from supra_db_update.migrator import SyncResult, stamp_injected_cols, sync_table
 from supra_db_update.table_map import TablePair, _br, load_table_map
 from supra_db_update.validators import (
+    TableContract,
     load_table_contracts,
     rules_for_table,
     validate_before_migration,
+    validate_table_contract,
 )
 
 log = logging.getLogger(__name__)
@@ -45,6 +47,44 @@ _COL_W = 46  # largura da coluna de nome de tabela na saída
 
 def _fmt(n: int) -> str:
     return f"{n:>10,}"
+
+
+def _print_alert_details(details: dict) -> None:
+    """Exibe amostra de contratos com regressão para alertas que falharam."""
+    for col_key, col_info in details.items():
+        if not isinstance(col_info, dict):
+            continue
+        amostra = col_info.get("amostra")
+        if not amostra:
+            continue
+        total = col_info.get("contratos_com_regressao", len(amostra))
+        print(f"      {col_key} — {len(amostra)} de {total:,} contrato(s) com regressão:")
+        headers = list(amostra[0].keys())
+        col_w = [max(len(h), 10) for h in headers]
+        for row in amostra:
+            for i, h in enumerate(headers):
+                col_w[i] = min(40, max(col_w[i], len(str(row.get(h) or ""))))
+        sep = "      +" + "+".join("-" * (w + 2) for w in col_w) + "+"
+        def _row_line(vals):
+            return "      |" + "|".join(
+                f" {str(v or '')[:w].ljust(w)} " for v, w in zip(vals, col_w)
+            ) + "|"
+        print(sep)
+        print(_row_line(headers))
+        print(sep)
+        for row in amostra:
+            print(_row_line([row.get(h) for h in headers]))
+        print(sep)
+
+
+def _print_alert_results(results: list[dict]) -> None:
+    if not results:
+        return
+    for r in results:
+        status = " OK " if r.get("ok") else "FAIL"
+        print(f"  [{status}] {r['message']}")
+        if not r.get("ok"):
+            _print_alert_details(r.get("details") or {})
 
 
 def _print_diff_table(diffs: list[TableDiff]) -> None:
@@ -192,8 +232,8 @@ def cmd_test_connections() -> int:
 # ---------------------------------------------------------------------------
 
 def run_validations_only(
-    src: pyodbc.Cursor,
-    dest_conn: pyodbc.Connection,
+    src: pymssql.Cursor,
+    dest_conn: pymssql.Connection,
     dest_label: str,
     tables: list[str],
     contracts_path: Path | None,
@@ -216,6 +256,54 @@ def run_validations_only(
     return ok_all
 
 
+def collect_alerts(
+    src_cur: pymssql.Cursor,
+    dst_conn: pymssql.Connection,
+    contracts_path: Path | None = None,
+) -> list[dict]:
+    """Coleta resultados de alertas como lista de dicts (para persistir no JSON)."""
+    contracts = load_table_contracts(contracts_path)
+    if not contracts:
+        return []
+    results: list[dict] = []
+    dst_cur = dst_conn.cursor()
+    try:
+        for contract in contracts.values():
+            for res in validate_table_contract(src_cur, dst_cur, contract):
+                results.append({
+                    "ok": res.ok,
+                    "table": contract.supra_table,
+                    "message": res.message,
+                    "details": res.details,
+                })
+    finally:
+        dst_cur.close()
+    return results
+
+
+def run_pre_migration_alerts(
+    src_cur: pymssql.Cursor,
+    dst_conn: pymssql.Connection,
+    ep_label: str,
+    contracts_path: Path | None = None,
+) -> bool:
+    """Executa e imprime todos os alertas. Retorna True se nenhum falhou."""
+    results = collect_alerts(src_cur, dst_conn, contracts_path)
+    if not results:
+        return True
+
+    print(f"\nAlertas pré-migração ({ep_label}):")
+    _print_alert_results(results)
+    all_ok = all(r.get("ok", True) for r in results)
+
+    if not all_ok:
+        print(
+            "\n[BLOQUEADO] Um ou mais alertas falharam. "
+            "Corrija os dados no SIMDNIT antes de migrar."
+        )
+    return all_ok
+
+
 def cmd_validate_tables(tables: list[str], contracts: Path | None) -> int:
     load_env()
     mode = pick_supra_mode()
@@ -233,6 +321,33 @@ def cmd_validate_tables(tables: list[str], contracts: Path | None) -> int:
             return exit_code
         finally:
             src_cur.close()
+
+
+def cmd_alerts(contracts_path: Path | None) -> int:
+    """Executa todos os alertas de segurança configurados. Não altera nenhum dado."""
+    load_env()
+    mode = pick_supra_mode()
+    sim_ep = simdnit_endpoint()
+    targets = supra_targets_for_mode(mode)
+
+    exit_code = 0
+    with connect_endpoint(sim_ep) as src_conn:
+        src_cur = src_conn.cursor()
+        try:
+            for ep in targets:
+                print(f"\n{'='*70}")
+                print(f"Origem : {sim_ep.label} ({sim_ep.database}@{sim_ep.host})")
+                print(f"Destino: {ep.label} ({ep.database}@{ep.host})")
+                print(f"{'='*70}")
+                with connect_endpoint(ep) as dst_conn:
+                    if not run_pre_migration_alerts(src_cur, dst_conn, ep.label, contracts_path):
+                        exit_code = 1
+        finally:
+            src_cur.close()
+
+    if exit_code == 0:
+        print("\nTodos os alertas passaram. Migração liberada.")
+    return exit_code
 
 
 # ---------------------------------------------------------------------------
@@ -316,20 +431,33 @@ def cmd_compare(
                         "serão afetados em cada tabela."
                     )
 
+                # ── alertas de segurança ───────────────────────────────────
+                print("\nColetando alertas de segurança...")
+                alert_results = collect_alerts(src_cur, dst_conn)
+                _print_alert_results(alert_results)
+
                 # ── gera fila de pendências ────────────────────────────────
                 if needs:
                     cs = build_changeset(diffs, ep.label, sg)
+                    cs.alerts = alert_results
                     if len(targets) > 1:
                         safe = ep.label.replace(" ", "_").replace("/", "-")
                         out_path = Path(f"pending_changes_{safe}.json")
                     else:
                         out_path = Path("pending_changes.json")
                     save_changeset(cs, out_path)
+                    blocked = cs.alerts_blocked
                     print(
                         f"\nPendências salvas em: {out_path}"
                         f"  ({cs.total_contracts} contrato(s) em {len(cs.tables)} tabela(s))"
                     )
-                    print("  Use 'review' para aceitar/rejeitar e 'apply' para aplicar.")
+                    if blocked:
+                        print(
+                            "  ⚠  Alertas de segurança registrados no JSON. "
+                            "Resolva antes de executar 'apply'."
+                        )
+                    else:
+                        print("  Use 'review' para aceitar/rejeitar e 'apply' para aplicar.")
 
     return exit_code
 
@@ -409,7 +537,12 @@ def cmd_sync(
                     print("\n[DRY-RUN] Nenhuma alteração foi feita.")
                     continue
 
-                # ── 4. Confirmação final ───────────────────────────────────
+                # ── 4. Alertas de segurança pré-migração ───────────────────
+                if not run_pre_migration_alerts(src_cur, dst_conn, ep.label):
+                    exit_code = 1
+                    continue
+
+                # ── 5. Confirmação final ───────────────────────────────────
                 if not yes:
                     total_contracts = sum(len(d.changed_contracts) for d in selected)
                     print(
@@ -421,7 +554,7 @@ def cmd_sync(
                         print("Cancelado.")
                         continue
 
-                # ── 5. Sincronização ───────────────────────────────────────
+                # ── 6. Sincronização ───────────────────────────────────────
                 print(f"\nSincronizando {len(selected)} tabela(s) em lotes de {batch_size}...")
                 results: list[SyncResult] = []
 
@@ -484,7 +617,7 @@ def cmd_sync(
     return exit_code
 
 
-def _get_all_cgcont_contracts(cur: pyodbc.Cursor, sg: str) -> list[str]:
+def _get_all_cgcont_contracts(cur: pymssql.Cursor, sg: str) -> list[str]:
     cur.execute(
         "SELECT DISTINCT NU_CON_FORMATADO FROM dbo.Dados_Contrato WHERE SG_UND_GESTORA = ?",
         (sg,),
@@ -867,6 +1000,14 @@ def cmd_apply(
 
     with connect_endpoint(sim_ep) as src_conn:
         with connect_endpoint(target) as dst_conn:
+            # ── alertas de segurança antes de qualquer alteração ──────────
+            src_cur_alerts = src_conn.cursor()
+            try:
+                if not run_pre_migration_alerts(src_cur_alerts, dst_conn, target.label):
+                    return 1
+            finally:
+                src_cur_alerts.close()
+
             for tc in tables_with_work:
                 contracts = tc.effective_contract_numbers
                 pair = pair_map.get(tc.table_supra)
@@ -1129,6 +1270,20 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("tables", nargs="+", help="Ex.: dbo.Dados_Medicao")
     v.add_argument("--contracts", type=Path, default=None)
     v.set_defaults(_run=lambda a: cmd_validate_tables(a.tables, a.contracts))
+
+    # alerts
+    al = sub.add_parser(
+        "alerts",
+        help="Executa todos os alertas de segurança pré-migração (não altera dados)",
+    )
+    al.add_argument(
+        "--contracts",
+        type=Path,
+        default=None,
+        metavar="ARQUIVO",
+        help="Caminho alternativo para table_contracts.yaml",
+    )
+    al.set_defaults(_run=lambda a: cmd_alerts(a.contracts))
 
     # compare
     cmp = sub.add_parser(

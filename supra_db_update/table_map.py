@@ -14,7 +14,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parent.parent
+from supra_db_update._paths import runtime_root as _runtime_root
+_ROOT = _runtime_root()
 _COLUMN_MAPPING = _ROOT / "column_mapping.json"
 _INFERENCE_GLOB = "inferencia_colunas_por_contrato_*.json"
 

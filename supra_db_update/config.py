@@ -30,11 +30,12 @@ class SqlServerEndpoint:
 
 
 def load_env() -> None:
+    from supra_db_update._paths import runtime_root
     dotenv_path = os.environ.get("DOTENV_PATH")
     if dotenv_path:
         load_dotenv(dotenv_path)
     else:
-        load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+        load_dotenv(runtime_root() / ".env")
 
 
 def _strip_quotes(s: str) -> str:
