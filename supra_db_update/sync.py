@@ -245,7 +245,7 @@ def run_validations_only(
         for qualified in tables:
             rules = rules_for_table(contracts, qualified)
             if not rules:
-                log.info("%s — %s sem regras em table_contracts.yaml; a ignorar.", dest_label, qualified)
+                log.info("%s — %s sem regras em import_rules.json; a ignorar.", dest_label, qualified)
                 continue
             res = validate_before_migration(src, dest_cur, qualified, rules)
             log.info("[%s] %s", dest_label, res.message)
@@ -260,6 +260,7 @@ def collect_alerts(
     src_cur: pymssql.Cursor,
     dst_conn: pymssql.Connection,
     contracts_path: Path | None = None,
+    sg: str = "",
 ) -> list[dict]:
     """Coleta resultados de alertas como lista de dicts (para persistir no JSON)."""
     contracts = load_table_contracts(contracts_path)
@@ -269,7 +270,7 @@ def collect_alerts(
     dst_cur = dst_conn.cursor()
     try:
         for contract in contracts.values():
-            for res in validate_table_contract(src_cur, dst_cur, contract):
+            for res in validate_table_contract(src_cur, dst_cur, contract, sg=sg):
                 results.append({
                     "ok": res.ok,
                     "table": contract.supra_table,
@@ -286,9 +287,10 @@ def run_pre_migration_alerts(
     dst_conn: pymssql.Connection,
     ep_label: str,
     contracts_path: Path | None = None,
+    sg: str = "",
 ) -> bool:
     """Executa e imprime todos os alertas. Retorna True se nenhum falhou."""
-    results = collect_alerts(src_cur, dst_conn, contracts_path)
+    results = collect_alerts(src_cur, dst_conn, contracts_path, sg=sg)
     if not results:
         return True
 
@@ -326,6 +328,7 @@ def cmd_validate_tables(tables: list[str], contracts: Path | None) -> int:
 def cmd_alerts(contracts_path: Path | None) -> int:
     """Executa todos os alertas de segurança configurados. Não altera nenhum dado."""
     load_env()
+    sg   = get_setting("SIMDNIT_SCOPE_SG_UND_GESTORA", default="CGCONT") or "CGCONT"
     mode = pick_supra_mode()
     sim_ep = simdnit_endpoint()
     targets = supra_targets_for_mode(mode)
@@ -340,7 +343,7 @@ def cmd_alerts(contracts_path: Path | None) -> int:
                 print(f"Destino: {ep.label} ({ep.database}@{ep.host})")
                 print(f"{'='*70}")
                 with connect_endpoint(ep) as dst_conn:
-                    if not run_pre_migration_alerts(src_cur, dst_conn, ep.label, contracts_path):
+                    if not run_pre_migration_alerts(src_cur, dst_conn, ep.label, contracts_path, sg=sg):
                         exit_code = 1
         finally:
             src_cur.close()
@@ -356,13 +359,14 @@ def cmd_alerts(contracts_path: Path | None) -> int:
 
 def cmd_check_counts(supra_table: str) -> int:
     load_env()
+    sg        = get_setting("SIMDNIT_SCOPE_SG_UND_GESTORA", default="CGCONT") or "CGCONT"
     contracts = load_table_contracts()
-    contract = contracts.get(supra_table)
+    contract  = contracts.get(supra_table)
     if contract is None:
-        print(f"Tabela {supra_table!r} não encontrada em table_contracts.yaml.")
+        print(f"Tabela {supra_table!r} não encontrada em import_rules.json (table_contracts).")
         return 1
 
-    sim_ep = simdnit_endpoint()
+    sim_ep  = simdnit_endpoint()
     targets = supra_targets_for_mode(pick_supra_mode())
 
     exit_code = 0
@@ -374,7 +378,7 @@ def cmd_check_counts(supra_table: str) -> int:
                     dst_cur = dst_conn.cursor()
                     try:
                         from supra_db_update.validators import _check_source_row_count_gte_target
-                        res = _check_source_row_count_gte_target(src_cur, dst_cur, contract)
+                        res = _check_source_row_count_gte_target(src_cur, dst_cur, contract, sg=sg)
                         status = "OK" if res.ok else "FAIL"
                         print(f"[{status}] {res.message}")
                         if not res.ok:
@@ -394,7 +398,7 @@ def cmd_check_date_regression() -> int:
     load_env()
     contracts = load_table_contracts()
     if not contracts:
-        print("Nenhuma tabela configurada em table_contracts.yaml.")
+        print("Nenhuma tabela configurada em import_rules.json.")
         return 0
 
     sim_ep = simdnit_endpoint()
@@ -430,6 +434,7 @@ def cmd_check_date_regression() -> int:
 
 def cmd_check_contract_values() -> int:
     load_env()
+    sg     = get_setting("SIMDNIT_SCOPE_SG_UND_GESTORA", default="CGCONT") or "CGCONT"
     sim_ep = simdnit_endpoint()
 
     with connect_endpoint(sim_ep) as conn:
@@ -440,10 +445,12 @@ def cmd_check_contract_values() -> int:
                 " [VALOR_INICIAL], [VALOR_TOTAL_DE_REAJUSTE],"
                 " [VALOR_TOTAL_DE_ADITIVOS], [VALOR_INICIAL_ADIT_REAJUSTES]"
                 " FROM [dbo].[Dados_Contrato]"
-                " WHERE [VALOR_INICIAL_ADIT_REAJUSTES] IS NOT NULL"
+                " WHERE [SG_UND_GESTORA] = %s"
+                "   AND [VALOR_INICIAL_ADIT_REAJUSTES] IS NOT NULL"
                 "   AND ABS([VALOR_INICIAL] + [VALOR_TOTAL_DE_REAJUSTE]"
                 "       + [VALOR_TOTAL_DE_ADITIVOS]"
-                "       - [VALOR_INICIAL_ADIT_REAJUSTES]) > 0.01"
+                "       - [VALOR_INICIAL_ADIT_REAJUSTES]) > 0.01",
+                (sg,),
             )
             rows = cur.fetchall()
         finally:
@@ -543,6 +550,64 @@ def _check_integrity_table(
     if len(issues) > 20:
         print(f"  ... e mais {len(issues) - 20} contrato(s)")
     return False
+
+
+def cmd_run_all() -> int:
+    """Executa todas as regras habilitadas em import_rules.json, depois compare --detail.
+
+    Formato de saída (lido pelo PHP getValidarStatus):
+        RULE:<id>:<ok|erro>:<output_linha1>\\n...
+        RULES_DONE
+        <saída normal do compare --detail>
+        __EXIT_CODE__:<N>          ← adicionado pelo wrapper shell no PHP
+    """
+    from supra_db_update._paths import runtime_root
+    rules_path = runtime_root() / "import_rules.json"
+
+    rules: list[dict] = []
+    if rules_path.is_file():
+        with rules_path.open(encoding="utf-8") as f:
+            raw = __import__("json").load(f)
+        rules = (raw.get("rules") if isinstance(raw, dict) else raw) or []
+
+    dir_path = str(runtime_root())
+    overall_ok = True
+
+    for rule in rules:
+        if rule.get("enabled") is False:
+            continue
+        rule_id   = rule.get("id", "rule")
+        rule_name = rule.get("name", rule_id)
+        sub_cmd   = rule.get("command", "").strip()
+        if not sub_cmd:
+            continue
+
+        import subprocess
+        import shlex
+        try:
+            argv = [sys.executable, "-m", "supra_db_update"] + shlex.split(sub_cmd)
+            result = subprocess.run(
+                argv,
+                capture_output=True,
+                text=True,
+                cwd=dir_path,
+            )
+            status  = "ok" if result.returncode == 0 else "erro"
+            output  = (result.stdout + result.stderr).strip().replace("\n", "\\n")
+        except Exception as exc:
+            status = "erro"
+            output = str(exc).replace("\n", "\\n")
+
+        if status != "ok":
+            overall_ok = False
+
+        print(f"RULE:{rule_id}:{status}:{output}", flush=True)
+
+    print("RULES_DONE", flush=True)
+
+    # Agora executa o compare --detail (saída inline)
+    cmp_code = cmd_compare(tables=[], mapping=None, deep=False, detail=True)
+    return 0 if (overall_ok and cmp_code == 0) else 1
 
 
 def cmd_check_data_integrity() -> int:
@@ -651,7 +716,7 @@ def cmd_compare(
 
                 # ── alertas de segurança ───────────────────────────────────
                 print("\nColetando alertas de segurança...")
-                alert_results = collect_alerts(src_cur, dst_conn)
+                alert_results = collect_alerts(src_cur, dst_conn, sg=sg)
                 _print_alert_results(alert_results)
 
                 # ── gera fila de pendências ────────────────────────────────
@@ -756,7 +821,7 @@ def cmd_sync(
                     continue
 
                 # ── 4. Alertas de segurança pré-migração ───────────────────
-                if not run_pre_migration_alerts(src_cur, dst_conn, ep.label):
+                if not run_pre_migration_alerts(src_cur, dst_conn, ep.label, sg=sg):
                     exit_code = 1
                     continue
 
@@ -837,7 +902,7 @@ def cmd_sync(
 
 def _get_all_cgcont_contracts(cur: pymssql.Cursor, sg: str) -> list[str]:
     cur.execute(
-        "SELECT DISTINCT NU_CON_FORMATADO FROM dbo.Dados_Contrato WHERE SG_UND_GESTORA = ?",
+        "SELECT DISTINCT NU_CON_FORMATADO FROM dbo.Dados_Contrato WHERE SG_UND_GESTORA = %s",
         (sg,),
     )
     return [str(r[0]) for r in cur.fetchall()]
@@ -922,13 +987,13 @@ def cmd_inspect(
                     # contagens — SIMDNIT sempre com escopo correto por SG_UND_GESTORA
                     src_cur.execute(
                         f"""SELECT COUNT(*) FROM {pair.simdnit_table}
-                            WHERE {jcol_sim} = ? AND {where_scope}""",
+                            WHERE {jcol_sim} = %s AND {where_scope}""",
                         (contract, *scope_params),
                     )
                     sim_n: int = src_cur.fetchone()[0]
 
                     dst_cur.execute(
-                        f"SELECT COUNT(*) FROM {pair.supra_table} WHERE {jcol_supra} = ?",
+                        f"SELECT COUNT(*) FROM {pair.supra_table} WHERE {jcol_supra} = %s",
                         (contract,),
                     )
                     supra_n: int = dst_cur.fetchone()[0]
@@ -959,7 +1024,7 @@ def cmd_inspect(
                         src_cur.execute(
                             f"""SELECT TOP {limit} {col_list}
                                 FROM {pair.simdnit_table}
-                                WHERE {jcol_sim} = ? AND {where_scope}""",
+                                WHERE {jcol_sim} = %s AND {where_scope}""",
                             (contract, *scope_params),
                         )
                         _print_rows(sim_cols, src_cur.fetchall(),
@@ -969,7 +1034,7 @@ def cmd_inspect(
                         col_list = ", ".join(_br(c) for c in supra_cols)
                         dst_cur.execute(
                             f"SELECT TOP {limit} {col_list} "
-                            f"FROM {pair.supra_table} WHERE {jcol_supra} = ?",
+                            f"FROM {pair.supra_table} WHERE {jcol_supra} = %s",
                             (contract,),
                         )
                         _print_rows(supra_cols, dst_cur.fetchall(),
@@ -1221,7 +1286,7 @@ def cmd_apply(
             # ── alertas de segurança antes de qualquer alteração ──────────
             src_cur_alerts = src_conn.cursor()
             try:
-                if not run_pre_migration_alerts(src_cur_alerts, dst_conn, target.label):
+                if not run_pre_migration_alerts(src_cur_alerts, dst_conn, target.label, sg=sg):
                     return 1
             finally:
                 src_cur_alerts.close()
@@ -1499,7 +1564,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         metavar="ARQUIVO",
-        help="Caminho alternativo para table_contracts.yaml",
+        help="Caminho alternativo para import_rules.json",
     )
     al.set_defaults(_run=lambda a: cmd_alerts(a.contracts))
 
@@ -1536,6 +1601,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verifica integridade por contrato: SIMDNIT não perdeu linhas que SUPRA já tem",
     )
     cdi.set_defaults(_run=lambda _: cmd_check_data_integrity())
+
+    # run-all
+    ra = sub.add_parser(
+        "run-all",
+        help="Executa todas as regras de import_rules.json e em seguida o compare --detail",
+    )
+    ra.set_defaults(_run=lambda _: cmd_run_all())
 
     # compare
     cmp = sub.add_parser(

@@ -5,7 +5,7 @@ a = Analysis(
     ['supra_db_update/__main__.py'],
     pathex=[],
     binaries=[],
-    datas=[('table_contracts.yaml', '.')],
+    datas=[],
     hiddenimports=['supra_db_update._paths', 'pymssql', 'yaml', 'dotenv'],
     hookspath=[],
     hooksconfig={},

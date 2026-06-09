@@ -108,13 +108,34 @@ def _split_schema_table(qualified: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
-def count_rows(cursor: pymssql.Cursor, schema: str, table: str) -> int | None:
+def count_rows(cursor: pymssql.Cursor, schema: str, table: str, where: str = "") -> int | None:
     try:
-        cursor.execute(f"SELECT COUNT_BIG(*) FROM [{schema}].[{table}]")
+        clause = f" WHERE {where}" if where else ""
+        cursor.execute(f"SELECT COUNT_BIG(*) FROM [{schema}].[{table}]{clause}")
         row = cursor.fetchone()
         return int(row[0]) if row else 0
     except Exception:
         return None
+
+
+def _scope_where_simdnit(contract: "TableContract", sg: str) -> str:
+    """Cláusula WHERE para escopar linhas SIMDNIT ao SG_UND_GESTORA configurado.
+
+    Dados_Contrato: filtra diretamente por [SG_UND_GESTORA].
+    Demais tabelas: filtra por [{join_simdnit}] IN (subquery em Dados_Contrato).
+    Reajuste usa [Contrato] como join, não NU_CON_FORMATADO — tratado via join_simdnit.
+    """
+    if not sg:
+        return ""
+    _, sim_table = _split_schema_table(contract.simdnit_table)
+    if sim_table == "Dados_Contrato":
+        return f"[SG_UND_GESTORA] = '{sg}'"
+    jc = contract.join_simdnit
+    return (
+        f"[{jc}] IN ("
+        f"SELECT [NU_CON_FORMATADO] FROM [dbo].[Dados_Contrato] "
+        f"WHERE [SG_UND_GESTORA] = '{sg}')"
+    )
 
 
 def _chunks(lst: list, n: int):
@@ -129,13 +150,19 @@ def _chunks(lst: list, n: int):
 def _check_source_row_count_gte_target(
     source: pymssql.Cursor,
     target: pymssql.Cursor,
-    contract: TableContract,
-) -> ValidationResult:
-    """SIMDNIT.total >= SUPRA.total — detecta deleção de linhas no SIMDNIT."""
+    contract: "TableContract",
+    sg: str = "",
+) -> "ValidationResult":
+    """SIMDNIT.total >= SUPRA.total — detecta deleção de linhas no SIMDNIT.
+
+    Quando `sg` é fornecido, filtra o lado SIMDNIT pelo escopo configurado
+    (SG_UND_GESTORA para Dados_Contrato; subquery para demais tabelas).
+    """
     sim_schema, sim_table = _split_schema_table(contract.simdnit_table)
     supra_schema, supra_table = _split_schema_table(contract.supra_table)
 
-    src_n = count_rows(source, sim_schema, sim_table)
+    where_sim = _scope_where_simdnit(contract, sg)
+    src_n = count_rows(source, sim_schema, sim_table, where_sim)
     tgt_n = count_rows(target, supra_schema, supra_table)
 
     details: dict[str, Any] = {
@@ -307,20 +334,22 @@ _RULE_HANDLERS: dict[str, Any] = {
 def validate_table_contract(
     source: pymssql.Cursor,
     target: pymssql.Cursor,
-    contract: TableContract,
-) -> list[ValidationResult]:
+    contract: "TableContract",
+    sg: str = "",
+) -> "list[ValidationResult]":
     """Executa todas as regras configuradas e devolve os resultados."""
     results: list[ValidationResult] = []
     for rule in contract.rules:
-        handler = _RULE_HANDLERS.get(rule)
-        if handler is None:
+        if rule == "source_row_count_gte_target":
+            results.append(_check_source_row_count_gte_target(source, target, contract, sg=sg))
+        elif rule == "no_1900_date_regression":
+            results.append(_check_no_1900_date_regression(source, target, contract))
+        else:
             results.append(ValidationResult(
                 ok=False,
                 message=f"Regra desconhecida: {rule!r}",
                 details={"rule": rule, "table": contract.supra_table},
             ))
-        else:
-            results.append(handler(source, target, contract))
     return results
 
 

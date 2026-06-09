@@ -48,7 +48,6 @@ docker run --rm \
     pyinstaller \
       --onefile \
       --name supra_db_update \
-      --add-data '/project/table_contracts.yaml:.' \
       --hidden-import supra_db_update._paths \
       --hidden-import pymssql \
       --hidden-import yaml \
@@ -78,7 +77,7 @@ echo "====================================================="
 echo ""
 echo "Para instalar no servidor:"
 echo "  ssh admin.rodolfo@DNIT-SIGACONT 'mkdir -p ~/supra_db_update'"
-echo "  scp dist/supra_db_update .env column_mapping.json admin.rodolfo@DNIT-SIGACONT:~/supra_db_update/"
+echo "  scp dist/supra_db_update .env column_mapping.json import_rules.json admin.rodolfo@DNIT-SIGACONT:~/supra_db_update/"
 echo "  ssh admin.rodolfo@DNIT-SIGACONT 'chmod +x ~/supra_db_update/supra_db_update'"
 echo ""
 echo "Para executar no servidor:"

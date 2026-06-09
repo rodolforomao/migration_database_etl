@@ -30,7 +30,7 @@ def get_sk_contrato_scoped(cm, nu: str) -> int | None:
     cur.execute(
         """
         SELECT TOP 1 SK_CONTRATO FROM dbo.Dados_Contrato
-        WHERE NU_CON_FORMATADO = ? AND SG_UND_GESTORA = ?
+        WHERE NU_CON_FORMATADO = %s AND SG_UND_GESTORA = %s
         """,
         (nu, sg),
     )
@@ -45,7 +45,7 @@ def validate_nu_in_scoped_dados_contrato(cm, nu: str) -> tuple[bool, str]:
     cur.execute(
         """
         SELECT 1 FROM dbo.Dados_Contrato
-        WHERE NU_CON_FORMATADO = ? AND SG_UND_GESTORA = ?
+        WHERE NU_CON_FORMATADO = %s AND SG_UND_GESTORA = %s
         """,
         (nu, sg),
     )
@@ -98,7 +98,7 @@ def sql_and_exists_scoped_dados_contrato(
     frag = f"""
     AND EXISTS (
       SELECT 1 FROM dbo.Dados_Contrato AS dc
-      WHERE dc.{br_ident('SG_UND_GESTORA')} = ?
+      WHERE dc.{br_ident('SG_UND_GESTORA')} = %s
       AND {link}
     )"""
     return frag, (sg,)
