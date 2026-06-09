@@ -118,6 +118,52 @@ def count_rows(cursor: pymssql.Cursor, schema: str, table: str, where: str = "")
         return None
 
 
+def count_rows_in(
+    cursor: pymssql.Cursor,
+    schema: str,
+    table: str,
+    col: str,
+    values: "list[str]",
+) -> "int | None":
+    """COUNT(*) filtrando [{col}] IN (values), executado em chunks para listas grandes."""
+    if not values:
+        return 0
+    total = 0
+    try:
+        for chunk in _chunks(values, _CHUNK):
+            ph = ",".join(["%s"] * len(chunk))
+            cursor.execute(
+                f"SELECT COUNT_BIG(*) FROM [{schema}].[{table}] WHERE [{col}] IN ({ph})",
+                chunk,
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            total += int(row[0])
+    except Exception:
+        return None
+    return total
+
+
+def _fetch_scope_contracts(source: pymssql.Cursor, sg: str) -> "list[str]":
+    """Retorna a lista de NU_CON_FORMATADO dos contratos no escopo SG_UND_GESTORA no SIMDNIT.
+
+    Usada para aplicar o mesmo escopo CGCONT ao lado SUPRA (via IN-list),
+    tornando a comparação de contagens apples-to-apples.
+    """
+    if not sg:
+        return []
+    try:
+        source.execute(
+            "SELECT [NU_CON_FORMATADO] FROM [dbo].[Dados_Contrato] "
+            "WHERE [SG_UND_GESTORA] = %s",
+            (sg,),
+        )
+        return [str(r[0]) for r in source.fetchall() if r[0] is not None]
+    except Exception:
+        return []
+
+
 def _scope_where_simdnit(contract: "TableContract", sg: str) -> str:
     """Cláusula WHERE para escopar linhas SIMDNIT ao SG_UND_GESTORA configurado.
 
@@ -153,23 +199,36 @@ def _check_source_row_count_gte_target(
     contract: "TableContract",
     sg: str = "",
 ) -> "ValidationResult":
-    """SIMDNIT.total >= SUPRA.total — detecta deleção de linhas no SIMDNIT.
+    """SIMDNIT(escopo CGCONT) >= SUPRA(mesmo escopo) — detecta deleção real de linhas.
 
-    Quando `sg` é fornecido, filtra o lado SIMDNIT pelo escopo configurado
-    (SG_UND_GESTORA para Dados_Contrato; subquery para demais tabelas).
+    Ambos os lados são restritos ao mesmo conjunto de contratos CGCONT:
+      - SIMDNIT: via subquery em Dados_Contrato WHERE SG_UND_GESTORA = sg
+      - SUPRA:   via IN-list dos mesmos NU_CON_FORMATADO (JOIN col = join_supra)
+
+    Isso evita falso-positivo causado por dados históricos no SUPRA para contratos
+    que não existem mais no escopo SIMDNIT/CGCONT.
     """
     sim_schema, sim_table = _split_schema_table(contract.simdnit_table)
     supra_schema, supra_table = _split_schema_table(contract.supra_table)
 
+    # Lado SIMDNIT — escopo CGCONT via subquery
     where_sim = _scope_where_simdnit(contract, sg)
     src_n = count_rows(source, sim_schema, sim_table, where_sim)
-    tgt_n = count_rows(target, supra_schema, supra_table)
 
+    # Lado SUPRA — mesmo escopo: busca lista de contratos CGCONT do SIMDNIT
+    if sg:
+        scope_contracts = _fetch_scope_contracts(source, sg)
+        tgt_n = count_rows_in(target, supra_schema, supra_table, contract.join_supra, scope_contracts)
+    else:
+        tgt_n = count_rows(target, supra_schema, supra_table)
+
+    scope_label = f" [escopo {sg}]" if sg else ""
     details: dict[str, Any] = {
         "simdnit_table": contract.simdnit_table,
         "supra_table": contract.supra_table,
         "simdnit_row_count": src_n,
         "supra_row_count": tgt_n,
+        "scope": sg or "sem escopo",
     }
 
     if src_n is None:
@@ -195,9 +254,9 @@ def _check_source_row_count_gte_target(
         return ValidationResult(
             ok=False,
             message=(
-                f"{contract.supra_table}: SIMDNIT tem {src_n:,} linhas e "
-                f"SUPRA tem {tgt_n:,} — SIMDNIT perdeu {tgt_n - src_n:,} "
-                "registro(s). Possível perda de dados no SIMDNIT."
+                f"{contract.supra_table}: SIMDNIT{scope_label} tem {src_n:,} linhas e "
+                f"SUPRA{scope_label} tem {tgt_n:,} — diferença de {tgt_n - src_n:,} "
+                "registro(s) a verificar."
             ),
             details=details,
         )
@@ -205,7 +264,7 @@ def _check_source_row_count_gte_target(
     return ValidationResult(
         ok=True,
         message=(
-            f"{contract.supra_table}: contagem OK "
+            f"{contract.supra_table}: contagem OK{scope_label} "
             f"(SIMDNIT={src_n:,} >= SUPRA={tgt_n:,})."
         ),
         details=details,
