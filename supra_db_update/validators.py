@@ -15,12 +15,12 @@ no_1900_date_regression
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import pymssql
-import yaml
 
 _CHUNK = 900
 
@@ -56,17 +56,9 @@ class ValidationResult:
 # Carregamento do YAML
 # ---------------------------------------------------------------------------
 
-def load_table_contracts(path: Path | None = None) -> dict[str, TableContract]:
-    if path is None:
-        from supra_db_update._paths import bundle_root
-        path = bundle_root() / "table_contracts.yaml"
-    if not path.is_file():
-        return {}
-    with path.open(encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
-
+def _parse_table_contracts_dict(tables_cfg: dict) -> "dict[str, TableContract]":
     result: dict[str, TableContract] = {}
-    for supra_table, cfg in (raw.get("tables") or {}).items():
+    for supra_table, cfg in (tables_cfg or {}).items():
         cfg = cfg or {}
         date_columns = [
             DateColPair(supra=d["supra"], simdnit=d["simdnit"])
@@ -81,6 +73,28 @@ def load_table_contracts(path: Path | None = None) -> dict[str, TableContract]:
             date_columns=date_columns,
         )
     return result
+
+
+def load_table_contracts(path: Path | None = None) -> "dict[str, TableContract]":
+    if path is None:
+        from supra_db_update._paths import runtime_root
+        path = runtime_root() / "import_rules.json"
+
+    if not path.is_file():
+        return {}
+
+    with path.open(encoding="utf-8") as f:
+        raw = json.load(f)
+
+    # New format: {"rules": [...], "table_contracts": {...}}
+    if isinstance(raw, dict) and "table_contracts" in raw:
+        return _parse_table_contracts_dict(raw["table_contracts"])
+
+    # Legacy YAML-style format: {"tables": {...}}
+    if isinstance(raw, dict) and "tables" in raw:
+        return _parse_table_contracts_dict(raw["tables"])
+
+    return {}
 
 
 # ---------------------------------------------------------------------------

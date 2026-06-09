@@ -351,6 +351,224 @@ def cmd_alerts(contracts_path: Path | None) -> int:
 
 
 # ---------------------------------------------------------------------------
+# cmd_check_counts  —  count check for one SUPRA table
+# ---------------------------------------------------------------------------
+
+def cmd_check_counts(supra_table: str) -> int:
+    load_env()
+    contracts = load_table_contracts()
+    contract = contracts.get(supra_table)
+    if contract is None:
+        print(f"Tabela {supra_table!r} não encontrada em table_contracts.yaml.")
+        return 1
+
+    sim_ep = simdnit_endpoint()
+    targets = supra_targets_for_mode(pick_supra_mode())
+
+    exit_code = 0
+    with connect_endpoint(sim_ep) as src_conn:
+        src_cur = src_conn.cursor()
+        try:
+            for ep in targets:
+                with connect_endpoint(ep) as dst_conn:
+                    dst_cur = dst_conn.cursor()
+                    try:
+                        from supra_db_update.validators import _check_source_row_count_gte_target
+                        res = _check_source_row_count_gte_target(src_cur, dst_cur, contract)
+                        status = "OK" if res.ok else "FAIL"
+                        print(f"[{status}] {res.message}")
+                        if not res.ok:
+                            exit_code = 1
+                    finally:
+                        dst_cur.close()
+        finally:
+            src_cur.close()
+    return exit_code
+
+
+# ---------------------------------------------------------------------------
+# cmd_check_date_regression  —  1900-date regression check for all tables
+# ---------------------------------------------------------------------------
+
+def cmd_check_date_regression() -> int:
+    load_env()
+    contracts = load_table_contracts()
+    if not contracts:
+        print("Nenhuma tabela configurada em table_contracts.yaml.")
+        return 0
+
+    sim_ep = simdnit_endpoint()
+    targets = supra_targets_for_mode(pick_supra_mode())
+
+    exit_code = 0
+    with connect_endpoint(sim_ep) as src_conn:
+        src_cur = src_conn.cursor()
+        try:
+            for ep in targets:
+                with connect_endpoint(ep) as dst_conn:
+                    dst_cur = dst_conn.cursor()
+                    try:
+                        from supra_db_update.validators import _check_no_1900_date_regression
+                        for contract in contracts.values():
+                            if "no_1900_date_regression" not in contract.rules:
+                                continue
+                            res = _check_no_1900_date_regression(src_cur, dst_cur, contract)
+                            status = "OK" if res.ok else "FAIL"
+                            print(f"[{status}] {res.message}")
+                            if not res.ok:
+                                exit_code = 1
+                    finally:
+                        dst_cur.close()
+        finally:
+            src_cur.close()
+    return exit_code
+
+
+# ---------------------------------------------------------------------------
+# cmd_check_contract_values  —  arithmetic check on Dados_Contrato (SIMDNIT)
+# ---------------------------------------------------------------------------
+
+def cmd_check_contract_values() -> int:
+    load_env()
+    sim_ep = simdnit_endpoint()
+
+    with connect_endpoint(sim_ep) as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "SELECT [NU_CON_FORMATADO],"
+                " [VALOR_INICIAL], [VALOR_TOTAL_DE_REAJUSTE],"
+                " [VALOR_TOTAL_DE_ADITIVOS], [VALOR_INICIAL_ADIT_REAJUSTES]"
+                " FROM [dbo].[Dados_Contrato]"
+                " WHERE [VALOR_INICIAL_ADIT_REAJUSTES] IS NOT NULL"
+                "   AND ABS([VALOR_INICIAL] + [VALOR_TOTAL_DE_REAJUSTE]"
+                "       + [VALOR_TOTAL_DE_ADITIVOS]"
+                "       - [VALOR_INICIAL_ADIT_REAJUSTES]) > 0.01"
+            )
+            rows = cur.fetchall()
+        finally:
+            cur.close()
+
+    if not rows:
+        print("OK dbo.Dados_Contrato: aritmética de valores consistente.")
+        return 0
+
+    print(f"FAIL dbo.Dados_Contrato: {len(rows)} contrato(s) com aritmética de valores inconsistente.")
+    print(f"  (esperado: VALOR_INICIAL + VALOR_TOTAL_DE_REAJUSTE + VALOR_TOTAL_DE_ADITIVOS = VALOR_INICIAL_ADIT_REAJUSTES)")
+    _SAMPLE = 20
+    sample = list(rows[:_SAMPLE])
+    header = ["contrato", "val_inicial", "val_reajuste", "val_aditivo", "val_ini_adit_reajuste"]
+    col_w = [max(len(h), 10) for h in header]
+    for r in sample:
+        for i, v in enumerate(r):
+            col_w[i] = min(40, max(col_w[i], len(str(v) if v is not None else "")))
+    sep = "  +" + "+".join("-" * (w + 2) for w in col_w) + "+"
+    def _row_line(vals):
+        return "  |" + "|".join(f" {str(v or '')[:w].ljust(w)} " for v, w in zip(vals, col_w)) + "|"
+    print(sep)
+    print(_row_line(header))
+    print(sep)
+    for r in sample:
+        print(_row_line(r))
+    print(sep)
+    if len(rows) > _SAMPLE:
+        print(f"  ... e mais {len(rows) - _SAMPLE} contrato(s)")
+    return 1
+
+
+# ---------------------------------------------------------------------------
+# cmd_check_data_integrity  —  per-contract row count for 3 tables
+# ---------------------------------------------------------------------------
+
+_INTEGRITY_TABLE_PAIRS = [
+    ("dbo.TB_SIAC_EMPENHO",       "dbo.Dados_Empenho",  "contrato", "NU_CON_FORMATADO"),
+    ("dbo.TB_SIAC_MEDICAO_MAIOR", "dbo.Dados_Medicao",  "contrato", "NU_CON_FORMATADO"),
+    ("dbo.TB_SIAC_REAJUSTE",      "dbo.Dados_Reajuste", "contrato", "Contrato"),
+]
+
+_CHUNK = 900
+
+
+def _check_integrity_table(
+    src_cur: pymssql.Cursor,
+    dst_cur: pymssql.Cursor,
+    supra_table: str,
+    simdnit_table: str,
+    join_supra: str,
+    join_simdnit: str,
+) -> bool:
+    s_schema, s_tbl = supra_table.split(".", 1)
+    m_schema, m_tbl = simdnit_table.split(".", 1)
+
+    dst_cur.execute(
+        f"SELECT [{join_supra}], COUNT(*) FROM [{s_schema}].[{s_tbl}]"
+        f" GROUP BY [{join_supra}]"
+    )
+    supra_counts: dict[str, int] = {str(r[0]): int(r[1]) for r in dst_cur.fetchall()}
+
+    if not supra_counts:
+        print(f"OK {supra_table}: sem dados no SUPRA para verificar.")
+        return True
+
+    simdnit_counts: dict[str, int] = {}
+    contracts = list(supra_counts.keys())
+    for i in range(0, len(contracts), _CHUNK):
+        chunk = contracts[i:i + _CHUNK]
+        ph = ",".join(["%s"] * len(chunk))
+        src_cur.execute(
+            f"SELECT [{join_simdnit}], COUNT(*) FROM [{m_schema}].[{m_tbl}]"
+            f" WHERE [{join_simdnit}] IN ({ph})"
+            f" GROUP BY [{join_simdnit}]",
+            chunk,
+        )
+        for r in src_cur.fetchall():
+            simdnit_counts[str(r[0])] = int(r[1])
+
+    issues = [
+        {"contrato": c, "linhas_supra": n, "linhas_simdnit": simdnit_counts.get(c, 0)}
+        for c, n in supra_counts.items()
+        if simdnit_counts.get(c, 0) < n
+    ]
+
+    if not issues:
+        print(f"OK {supra_table}: integridade verificada ({len(supra_counts):,} contratos).")
+        return True
+
+    print(f"ALERTA {supra_table}: {len(issues)} contrato(s) com menos linhas no SIMDNIT que no SUPRA.")
+    for item in issues[:20]:
+        print(
+            f"  {item['contrato']}: SUPRA={item['linhas_supra']}"
+            f" SIMDNIT={item['linhas_simdnit']}"
+        )
+    if len(issues) > 20:
+        print(f"  ... e mais {len(issues) - 20} contrato(s)")
+    return False
+
+
+def cmd_check_data_integrity() -> int:
+    load_env()
+    sim_ep = simdnit_endpoint()
+    targets = supra_targets_for_mode(pick_supra_mode())
+
+    exit_code = 0
+    with connect_endpoint(sim_ep) as src_conn:
+        src_cur = src_conn.cursor()
+        try:
+            for ep in targets:
+                with connect_endpoint(ep) as dst_conn:
+                    dst_cur = dst_conn.cursor()
+                    try:
+                        for args in _INTEGRITY_TABLE_PAIRS:
+                            if not _check_integrity_table(src_cur, dst_cur, *args):
+                                exit_code = 1
+                    finally:
+                        dst_cur.close()
+        finally:
+            src_cur.close()
+    return exit_code
+
+
+# ---------------------------------------------------------------------------
 # cmd_compare
 # ---------------------------------------------------------------------------
 
@@ -1284,6 +1502,40 @@ def build_parser() -> argparse.ArgumentParser:
         help="Caminho alternativo para table_contracts.yaml",
     )
     al.set_defaults(_run=lambda a: cmd_alerts(a.contracts))
+
+    # check-counts
+    cc = sub.add_parser(
+        "check-counts",
+        help="Verifica contagem de linhas SIMDNIT >= SUPRA para uma tabela específica",
+    )
+    cc.add_argument(
+        "--table",
+        required=True,
+        metavar="SUPRA_TABLE",
+        help="Nome da tabela SUPRA (ex.: dbo.TB_SIAC_MEDICAO_MAIOR)",
+    )
+    cc.set_defaults(_run=lambda a: cmd_check_counts(a.table))
+
+    # check-date-regression
+    cdr = sub.add_parser(
+        "check-date-regression",
+        help="Verifica regressão de datas (1900) em todas as tabelas configuradas",
+    )
+    cdr.set_defaults(_run=lambda _: cmd_check_date_regression())
+
+    # check-contract-values
+    ccv = sub.add_parser(
+        "check-contract-values",
+        help="Verifica aritmética de valores em dbo.Dados_Contrato (SIMDNIT)",
+    )
+    ccv.set_defaults(_run=lambda _: cmd_check_contract_values())
+
+    # check-data-integrity
+    cdi = sub.add_parser(
+        "check-data-integrity",
+        help="Verifica integridade por contrato: SIMDNIT não perdeu linhas que SUPRA já tem",
+    )
+    cdi.set_defaults(_run=lambda _: cmd_check_data_integrity())
 
     # compare
     cmp = sub.add_parser(

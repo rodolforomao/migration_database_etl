@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def bundle_root() -> Path:
-    """Raiz dos arquivos de dados empacotados (column_mapping.json, table_contracts.yaml).
+    """Raiz dos arquivos de dados empacotados (column_mapping.json).
 
     Dentro de um executável PyInstaller aponta para sys._MEIPASS (pasta temp
     onde os dados são extraídos). Em execução normal aponta para a raiz do projeto.
