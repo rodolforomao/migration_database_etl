@@ -1,0 +1,146 @@
+[
+    {
+        "timestamp": "2026-06-09T18:47:45",
+        "target_label": "SUPRA_PROD",
+        "generated_at": "2026-06-09T18:46:22",
+        "total_aceitos": 30,
+        "tabelas": [
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+                "contratos": 5
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+                "contratos": 12
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+                "contratos": 12
+            },
+            {
+                "table": "dbo.TB_SIAC_REAJUSTE",
+                "contratos": 1
+            }
+        ],
+        "status": "erro",
+        "exit_code": 1,
+        "output_excerpt": "Changeset: 2026-06-09T18:46:22  —  SUPRA_PROD | Aplicando 4 tabela(s) \/ 30 contrato(s) aceito(s)... | Alertas pré-migração (SUPRA_PROD):"
+    },
+    {
+        "timestamp": "2026-06-10T17:54:10",
+        "target_label": "SUPRA_LOCAL",
+        "generated_at": "2026-06-10T17:51:42",
+        "total_aceitos": 114,
+        "tabelas": [
+            {
+                "table": "dbo.TB_SIAC_EMPENHO",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+                "contratos": 16
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_ORG",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+                "contratos": 44
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+                "contratos": 44
+            },
+            {
+                "table": "dbo.TB_SIAC_REAJUSTE",
+                "contratos": 7
+            },
+            {
+                "table": "dbo.TB_SIAC_TERMO_ADITIVO",
+                "contratos": 1
+            }
+        ],
+        "status": "erro",
+        "exit_code": 1,
+        "output_excerpt": "Changeset: 2026-06-10T17:51:42  —  SUPRA_LOCAL | Aplicando 7 tabela(s) \/ 114 contrato(s) aceito(s)... | Alertas pré-migração (SUPRA_LOCAL):"
+    },
+    {
+        "timestamp": "2026-06-10T17:55:20",
+        "target_label": "SUPRA_LOCAL",
+        "generated_at": "2026-06-10T17:51:42",
+        "total_aceitos": 114,
+        "tabelas": [
+            {
+                "table": "dbo.TB_SIAC_EMPENHO",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+                "contratos": 16
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_ORG",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+                "contratos": 44
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+                "contratos": 44
+            },
+            {
+                "table": "dbo.TB_SIAC_REAJUSTE",
+                "contratos": 7
+            },
+            {
+                "table": "dbo.TB_SIAC_TERMO_ADITIVO",
+                "contratos": 1
+            }
+        ],
+        "status": "erro",
+        "exit_code": 1,
+        "output_excerpt": "Changeset: 2026-06-10T17:51:42  —  SUPRA_LOCAL | Aplicando 7 tabela(s) \/ 114 contrato(s) aceito(s)... | Alertas pré-migração (SUPRA_LOCAL):"
+    },
+    {
+        "timestamp": "2026-06-10T18:40:08",
+        "target_label": "SUPRA_LOCAL",
+        "generated_at": "2026-06-10T18:38:03",
+        "total_aceitos": 114,
+        "tabelas": [
+            {
+                "table": "dbo.TB_SIAC_EMPENHO",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+                "contratos": 16
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_ORG",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+                "contratos": 44
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+                "contratos": 44
+            },
+            {
+                "table": "dbo.TB_SIAC_REAJUSTE",
+                "contratos": 7
+            },
+            {
+                "table": "dbo.TB_SIAC_TERMO_ADITIVO",
+                "contratos": 1
+            }
+        ],
+        "status": "erro",
+        "exit_code": 1,
+        "output_excerpt": "Changeset: 2026-06-10T18:38:03  —  SUPRA_LOCAL | Aplicando 7 tabela(s) \/ 114 contrato(s) aceito(s)... | Alertas pré-migração (SUPRA_LOCAL):"
+    }
+]

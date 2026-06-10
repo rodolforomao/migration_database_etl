@@ -1233,6 +1233,7 @@ def cmd_apply(
     path: Path,
     mapping: Path | None,
     batch_size: int,
+    force: bool = False,
 ) -> int:
     if not path.exists():
         print(f"Arquivo não encontrado: {path}")
@@ -1286,8 +1287,11 @@ def cmd_apply(
             # ── alertas de segurança antes de qualquer alteração ──────────
             src_cur_alerts = src_conn.cursor()
             try:
-                if not run_pre_migration_alerts(src_cur_alerts, dst_conn, target.label, sg=sg):
-                    return 1
+                alerts_ok = run_pre_migration_alerts(src_cur_alerts, dst_conn, target.label, sg=sg)
+                if not alerts_ok:
+                    if not force:
+                        return 1
+                    print("\n[AVISO] --force ativo: prosseguindo apesar dos alertas acima.")
             finally:
                 src_cur_alerts.close()
 
@@ -1687,7 +1691,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="Linhas por lote no INSERT (padrão: 500)",
     )
-    apl.set_defaults(_run=lambda a: cmd_apply(a.path, a.mapping, a.batch_size))
+    apl.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Aplica mesmo que alertas pré-migração falhem",
+    )
+    apl.set_defaults(_run=lambda a: cmd_apply(a.path, a.mapping, a.batch_size, a.force))
 
     # sync
     syn = sub.add_parser(
