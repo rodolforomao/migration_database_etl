@@ -26,7 +26,7 @@ from supra_db_update.config import (
 )
 from supra_db_update.connection import connect_endpoint, test_connection
 from supra_db_update.differ import ContractDiff, TableDiff, RowDiff, _build_scope_where, compare_table, diff_rows_for_contract
-from supra_db_update.migrator import SyncResult, stamp_injected_cols, sync_table
+from supra_db_update.migrator import SyncResult, dedup_tables, stamp_injected_cols, sync_table
 from supra_db_update.table_map import TablePair, _br, load_table_map
 from supra_db_update.validators import (
     TableContract,
@@ -570,20 +570,39 @@ def cmd_run_all() -> int:
             raw = __import__("json").load(f)
         rules = (raw.get("rules") if isinstance(raw, dict) else raw) or []
 
+    # Pré-dedup: remove cópias exatas do SUPRA antes das regras de contagem,
+    # evitando falsos positivos causados por linhas duplicadas acumuladas.
+    print("Verificando e removendo duplicatas exatas das tabelas SUPRA...", flush=True)
+    try:
+        load_env()
+        _targets = supra_targets_for_mode(pick_supra_mode())
+        _all_pairs = load_table_map(None)
+        if _targets and _all_pairs:
+            for _ep in _targets:
+                with connect_endpoint(_ep) as _dst:
+                    dedup_tables(_dst, _all_pairs)
+    except Exception as _e:
+        print(f"  [dedup] Aviso: não foi possível deduplicar ({_e})", flush=True)
+
     dir_path = str(runtime_root())
     overall_ok = True
 
-    for rule in rules:
-        if rule.get("enabled") is False:
-            continue
+    import subprocess
+    import shlex
+
+    enabled_rules = [
+        r for r in rules
+        if r.get("enabled") is not False and r.get("command", "").strip()
+    ]
+    total = len(enabled_rules)
+
+    for idx, rule in enumerate(enabled_rules, 1):
         rule_id   = rule.get("id", "rule")
         rule_name = rule.get("name", rule_id)
         sub_cmd   = rule.get("command", "").strip()
-        if not sub_cmd:
-            continue
 
-        import subprocess
-        import shlex
+        print(f"[Regra {idx}/{total}] {rule_name}...", flush=True)
+
         try:
             argv = [sys.executable, "-m", "supra_db_update"] + shlex.split(sub_cmd)
             result = subprocess.run(
@@ -604,6 +623,7 @@ def cmd_run_all() -> int:
         print(f"RULE:{rule_id}:{status}:{output}", flush=True)
 
     print("RULES_DONE", flush=True)
+    print("Iniciando comparação SIMDNIT↔SUPRA...", flush=True)
 
     # Agora executa o compare --detail (saída inline)
     cmp_code = cmd_compare(tables=[], mapping=None, deep=False, detail=True)
@@ -1294,6 +1314,16 @@ def cmd_apply(
                     print("\n[AVISO] --force ativo: prosseguindo apesar dos alertas acima.")
             finally:
                 src_cur_alerts.close()
+
+            # ── pré-dedup: remove cópias exatas antes do D/I ─────────────
+            active_pairs = [
+                pair_map[tc.table_supra]
+                for tc in tables_with_work
+                if tc.table_supra in pair_map
+            ]
+            if active_pairs:
+                print("\nRemovendo duplicatas exatas das tabelas SUPRA...")
+                dedup_tables(dst_conn, active_pairs)
 
             for tc in tables_with_work:
                 contracts = tc.effective_contract_numbers

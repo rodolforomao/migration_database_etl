@@ -173,6 +173,49 @@ def stamp_injected_cols(
     return stamped
 
 
+def dedup_tables(
+    dst_conn: pymssql.Connection,
+    pairs: "list[TablePair]",
+) -> None:
+    """Remove linhas exatamente duplicadas (todos os campos iguais) das tabelas antes do sync.
+
+    Usa CTE + ROW_NUMBER particionado por TODAS as colunas — só apaga cópias 100% idênticas.
+    Tabelas sem duplicatas passam sem custo (rowcount = 0).
+    """
+    dst_cur = dst_conn.cursor()
+    dst_conn.autocommit(False)
+    try:
+        for pair in pairs:
+            all_supra = [p.supra for p in pair.pairs]
+            for ej in pair.extra_joins:
+                all_supra.extend(ec.supra for ec in ej.columns)
+            if not all_supra:
+                continue
+            partition_cols = ", ".join(_br(c) for c in all_supra)
+            sql = (
+                f"WITH _cte AS ("
+                f"SELECT ROW_NUMBER() OVER ("
+                f"PARTITION BY {partition_cols} "
+                f"ORDER BY (SELECT NULL)) AS _rn "
+                f"FROM {pair.supra_table}"
+                f") DELETE FROM _cte WHERE _rn > 1"
+            )
+            dst_cur.execute(sql)
+            n = dst_cur.rowcount
+            if n > 0:
+                print(
+                    f"  [dedup] {pair.supra_table}: {n:,} linha(s) duplicada(s) removida(s).",
+                    flush=True,
+                )
+        dst_conn.commit()
+    except Exception as exc:
+        dst_conn.rollback()
+        print(f"  [dedup] Aviso: erro ao deduplicar — {exc}", flush=True)
+    finally:
+        dst_conn.autocommit(True)
+        dst_cur.close()
+
+
 def sync_table(
     src_conn: pymssql.Connection,
     dst_conn: pymssql.Connection,
@@ -215,13 +258,17 @@ def sync_table(
         supra_only = sup_norm - sim_norm    # linhas no SUPRA que NÃO estão no SIMDNIT
         simdnit_only_norm = sim_norm - sup_norm  # linhas no SIMDNIT que não estão no SUPRA
 
-        if not supra_only and not simdnit_only_norm:
+        # duplicatas no SUPRA: o set collapsa cópias idênticas — se há mais linhas
+        # brutas do que entradas únicas, o SUPRA tem duplicatas para esses contratos
+        has_supra_duplicates = len(supra_rows) > len(sup_norm)
+
+        if not supra_only and not simdnit_only_norm and not has_supra_duplicates:
             # tudo idêntico após normalização — nada a fazer
             log.info("  Sem alterações reais após verificação numérica. Nenhuma ação necessária.")
             result.contracts_synced = contracts[:]
             return result
 
-        if not supra_only:
+        if not supra_only and not has_supra_duplicates:
             # todas as linhas do SUPRA já existem no SIMDNIT — apenas INSERTs necessários
             # (evita DELETE+reinsert de linhas que já estão corretas)
             rows_to_insert = [r for r in sim_rows if _norm_row(tuple(r)) not in sup_norm]
@@ -231,13 +278,19 @@ def sync_table(
                 len(rows_to_insert),
             )
         else:
-            # há linhas no SUPRA que não existem no SIMDNIT → refresh completo por segurança
+            # há linhas divergentes OU duplicatas no SUPRA → refresh completo por segurança
             rows_to_insert = sim_rows
             contracts_to_delete = contracts
-            log.info(
-                "  %d linha(s) do SUPRA divergem → DELETE + INSERT completo.",
-                len(supra_only),
-            )
+            if has_supra_duplicates:
+                log.info(
+                    "  %d linha(s) duplicadas no SUPRA → DELETE + INSERT completo para limpar.",
+                    len(supra_rows) - len(sup_norm),
+                )
+            else:
+                log.info(
+                    "  %d linha(s) do SUPRA divergem → DELETE + INSERT completo.",
+                    len(supra_only),
+                )
 
         # 3. executa dentro de transação
         dst_conn.autocommit(False)

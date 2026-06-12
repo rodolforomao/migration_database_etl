@@ -142,5 +142,255 @@
         "status": "erro",
         "exit_code": 1,
         "output_excerpt": "Changeset: 2026-06-10T18:38:03  —  SUPRA_LOCAL | Aplicando 7 tabela(s) \/ 114 contrato(s) aceito(s)... | Alertas pré-migração (SUPRA_LOCAL):"
+    },
+    {
+        "timestamp": "2026-06-10T18:46:39",
+        "target_label": "SUPRA_LOCAL",
+        "generated_at": "2026-06-10T18:45:28",
+        "total_aceitos": 114,
+        "tabelas": [
+            {
+                "table": "dbo.TB_SIAC_EMPENHO",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+                "contratos": 16
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_ORG",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+                "contratos": 44
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+                "contratos": 44
+            },
+            {
+                "table": "dbo.TB_SIAC_REAJUSTE",
+                "contratos": 7
+            },
+            {
+                "table": "dbo.TB_SIAC_TERMO_ADITIVO",
+                "contratos": 1
+            }
+        ],
+        "status": "erro",
+        "exit_code": 1,
+        "output_excerpt": "Changeset: 2026-06-10T18:45:28  —  SUPRA_LOCAL | Aplicando 7 tabela(s) \/ 114 contrato(s) aceito(s)... | Alertas pré-migração (SUPRA_LOCAL):"
+    },
+    {
+        "timestamp": "2026-06-10T18:47:18",
+        "target_label": "SUPRA_LOCAL",
+        "generated_at": "2026-06-10T18:45:28",
+        "total_aceitos": 114,
+        "tabelas": [
+            {
+                "table": "dbo.TB_SIAC_EMPENHO",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+                "contratos": 16
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_ORG",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+                "contratos": 44
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+                "contratos": 44
+            },
+            {
+                "table": "dbo.TB_SIAC_REAJUSTE",
+                "contratos": 7
+            },
+            {
+                "table": "dbo.TB_SIAC_TERMO_ADITIVO",
+                "contratos": 1
+            }
+        ],
+        "status": "ok",
+        "exit_code": 0,
+        "output_excerpt": "Buscando dados SIMDNIT: dbo.Dados_Empenho (1 contratos)... | SUPRA é subconjunto do SIMDNIT — apenas 1 INSERT(s), sem DELETE. | Changeset: 2026-06-10T18:45:28  —  SUPRA_LOCAL"
+    },
+    {
+        "timestamp": "2026-06-12T16:03:34",
+        "target_label": "SUPRA_LOCAL",
+        "generated_at": "2026-06-12T15:59:28",
+        "total_aceitos": 213,
+        "tabelas": [
+            {
+                "table": "dbo.TB_SIAC_EMPENHO",
+                "contratos": 2
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+                "contratos": 25
+            },
+            {
+                "table": "dbo.TB_SIAC_FINANCEIRO",
+                "contratos": 15
+            },
+            {
+                "table": "dbo.TB_SIAC_FISCAL_CONTRATO",
+                "contratos": 2
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+                "contratos": 9
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+                "contratos": 37
+            },
+            {
+                "table": "dbo.TB_SIAC_REAJUSTE",
+                "contratos": 2
+            },
+            {
+                "table": "dbo.TB_SIAC_SEGMENTO",
+                "contratos": 118
+            },
+            {
+                "table": "dbo.TB_SIAC_TERMO_ADITIVO",
+                "contratos": 3
+            }
+        ],
+        "status": "erro",
+        "exit_code": 1,
+        "output_excerpt": "Changeset: 2026-06-12T15:59:28  —  SUPRA_LOCAL | Aplicando 9 tabela(s) \/ 213 contrato(s) aceito(s)... | Alertas pré-migração (SUPRA_LOCAL):"
+    },
+    {
+        "timestamp": "2026-06-12T16:04:22",
+        "target_label": "SUPRA_LOCAL",
+        "generated_at": "2026-06-12T15:59:28",
+        "total_aceitos": 213,
+        "tabelas": [
+            {
+                "table": "dbo.TB_SIAC_EMPENHO",
+                "contratos": 2
+            },
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+                "contratos": 25
+            },
+            {
+                "table": "dbo.TB_SIAC_FINANCEIRO",
+                "contratos": 15
+            },
+            {
+                "table": "dbo.TB_SIAC_FISCAL_CONTRATO",
+                "contratos": 2
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+                "contratos": 9
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+                "contratos": 37
+            },
+            {
+                "table": "dbo.TB_SIAC_REAJUSTE",
+                "contratos": 2
+            },
+            {
+                "table": "dbo.TB_SIAC_SEGMENTO",
+                "contratos": 118
+            },
+            {
+                "table": "dbo.TB_SIAC_TERMO_ADITIVO",
+                "contratos": 3
+            }
+        ],
+        "status": "ok",
+        "exit_code": 0,
+        "output_excerpt": "Changeset: 2026-06-12T15:59:28  —  SUPRA_LOCAL | Aplicando 9 tabela(s) \/ 213 contrato(s) aceito(s)... | Alertas pré-migração (SUPRA_LOCAL):"
+    },
+    {
+        "timestamp": "2026-06-12T16:07:01",
+        "target_label": "SUPRA_LOCAL",
+        "generated_at": "2026-06-12T16:06:07",
+        "total_aceitos": 1354,
+        "tabelas": [
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+                "contratos": 1315
+            },
+            {
+                "table": "dbo.TB_SIAC_FISCAL_CONTRATO",
+                "contratos": 2
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_REAJUSTE",
+                "contratos": 12
+            },
+            {
+                "table": "dbo.TB_SIAC_SEGMENTO",
+                "contratos": 12
+            },
+            {
+                "table": "dbo.TB_SIAC_TERMO_ADITIVO",
+                "contratos": 11
+            }
+        ],
+        "status": "erro",
+        "exit_code": 1,
+        "output_excerpt": "Changeset: 2026-06-12T16:06:07  —  SUPRA_LOCAL | Aplicando 7 tabela(s) \/ 1354 contrato(s) aceito(s)... | Alertas pré-migração (SUPRA_LOCAL):"
+    },
+    {
+        "timestamp": "2026-06-12T16:07:56",
+        "target_label": "SUPRA_LOCAL",
+        "generated_at": "2026-06-12T16:06:07",
+        "total_aceitos": 1354,
+        "tabelas": [
+            {
+                "table": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
+                "contratos": 1315
+            },
+            {
+                "table": "dbo.TB_SIAC_FISCAL_CONTRATO",
+                "contratos": 2
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
+                "contratos": 1
+            },
+            {
+                "table": "dbo.TB_SIAC_REAJUSTE",
+                "contratos": 12
+            },
+            {
+                "table": "dbo.TB_SIAC_SEGMENTO",
+                "contratos": 12
+            },
+            {
+                "table": "dbo.TB_SIAC_TERMO_ADITIVO",
+                "contratos": 11
+            }
+        ],
+        "status": "ok",
+        "exit_code": 0,
+        "output_excerpt": "Changeset: 2026-06-12T16:06:07  —  SUPRA_LOCAL | Aplicando 7 tabela(s) \/ 1354 contrato(s) aceito(s)... | Alertas pré-migração (SUPRA_LOCAL):"
     }
 ]
