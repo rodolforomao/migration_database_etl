@@ -30,6 +30,9 @@ from supra_db_update.migrator import SyncResult, dedup_tables, stamp_injected_co
 from supra_db_update.table_map import TablePair, _br, load_table_map
 from supra_db_update.validators import (
     TableContract,
+    _chunks as _val_chunks,
+    _CHUNK as _VAL_CHUNK,
+    _fetch_scope_contracts,
     load_table_contracts,
     rules_for_table,
     validate_before_migration,
@@ -85,6 +88,93 @@ def _print_alert_results(results: list[dict]) -> None:
         print(f"  [{status}] {r['message']}")
         if not r.get("ok"):
             _print_alert_details(r.get("details") or {})
+
+
+def _print_count_breakdown(
+    src_cur: "pymssql.Cursor",
+    dst_cur: "pymssql.Cursor",
+    contract: "TableContract",
+    sg: str,
+    sample: int = 50,
+) -> None:
+    """Mostra quais contratos têm SUPRA count > SIMDNIT count quando check-counts falha."""
+    try:
+        scope = _fetch_scope_contracts(src_cur, sg) if sg else []
+        if not scope:
+            return
+
+        # contagem por contrato no SUPRA
+        supra_by: dict[str, int] = {}
+        for chunk in _val_chunks(scope, _VAL_CHUNK):
+            ph = ",".join(["%s"] * len(chunk))
+            dst_cur.execute(
+                f"SELECT [{contract.join_supra}], COUNT(*) "
+                f"FROM {contract.supra_table} "
+                f"WHERE [{contract.join_supra}] IN ({ph}) "
+                f"GROUP BY [{contract.join_supra}]",
+                chunk,
+            )
+            for r in dst_cur.fetchall():
+                supra_by[str(r[0])] = int(r[1])
+
+        # contagem por contrato no SIMDNIT
+        simdnit_by: dict[str, int] = {}
+        for chunk in _val_chunks(scope, _VAL_CHUNK):
+            ph = ",".join(["%s"] * len(chunk))
+            src_cur.execute(
+                f"SELECT [{contract.join_simdnit}], COUNT(*) "
+                f"FROM {contract.simdnit_table} "
+                f"WHERE [{contract.join_simdnit}] IN ({ph}) "
+                f"GROUP BY [{contract.join_simdnit}]",
+                chunk,
+            )
+            for r in src_cur.fetchall():
+                simdnit_by[str(r[0])] = int(r[1])
+
+        problematic = [
+            {"contrato": cont, "simdnit": simdnit_by.get(cont, 0), "supra": sup_n,
+             "diferenca": sup_n - simdnit_by.get(cont, 0)}
+            for cont, sup_n in supra_by.items()
+            if sup_n > simdnit_by.get(cont, 0)
+        ]
+
+        if not problematic:
+            print("  (diferença total mas sem contrato individual com SUPRA > SIMDNIT"
+                  " — possível variação de escopo ou duplicatas globais)")
+            return
+
+        problematic.sort(key=lambda x: (-x["diferenca"], x["contrato"]))
+        total = len(problematic)
+        amostra = problematic[:sample]
+
+        print(f"  Contratos com SUPRA > SIMDNIT ({total} encontrado(s)"
+              + (f" — exibindo {sample}" if total > sample else "") + "):")
+
+        headers = ["contrato", "simdnit", "supra", "diferenca"]
+        col_w = [max(len(h), 8) for h in headers]
+        for row in amostra:
+            for i, h in enumerate(headers):
+                col_w[i] = min(35, max(col_w[i], len(str(row[h] if row[h] is not None else ""))))
+
+        sep = "  +" + "+".join("-" * (w + 2) for w in col_w) + "+"
+        def _rline(vals: list) -> str:
+            return "  |" + "|".join(
+                f" {str(v if v is not None else '')[:w].ljust(w)} "
+                for v, w in zip(vals, col_w)
+            ) + "|"
+
+        print(sep)
+        print(_rline(headers))
+        print(sep)
+        for row in amostra:
+            print(_rline([row[h] for h in headers]))
+        print(sep)
+
+        if total > sample:
+            print(f"  ... e mais {total - sample} contrato(s)")
+
+    except Exception as exc:
+        print(f"  [breakdown] Erro ao detalhar por contrato: {exc}")
 
 
 def _print_diff_table(diffs: list[TableDiff]) -> None:
@@ -383,6 +473,7 @@ def cmd_check_counts(supra_table: str) -> int:
                         print(f"[{status}] {res.message}")
                         if not res.ok:
                             exit_code = 1
+                            _print_count_breakdown(src_cur, dst_cur, contract, sg)
                     finally:
                         dst_cur.close()
         finally:
@@ -421,6 +512,7 @@ def cmd_check_date_regression() -> int:
                             print(f"[{status}] {res.message}")
                             if not res.ok:
                                 exit_code = 1
+                                _print_alert_details(res.details)
                     finally:
                         dst_cur.close()
         finally:
@@ -552,6 +644,93 @@ def _check_integrity_table(
     return False
 
 
+# cmd_check_reajuste_null_date — alerta quando SIMDNIT tem reajustes sem data de assinatura
+# ---------------------------------------------------------------------------
+
+def cmd_check_reajuste_null_date() -> int:
+    load_env()
+    sg = get_setting("SIMDNIT_SCOPE_SG_UND_GESTORA", default="CGCONT") or "CGCONT"
+    sim_ep = simdnit_endpoint()
+
+    with connect_endpoint(sim_ep) as src_conn:
+        cur = src_conn.cursor()
+        cur.execute(
+            """
+            SELECT r.Contrato, COUNT(*) AS cnt
+            FROM dbo.Dados_Reajuste r
+            WHERE r.Contrato IN (
+                SELECT NU_CON_FORMATADO FROM dbo.Dados_Contrato WHERE SG_UND_GESTORA = %s
+            )
+              AND r.Data_da_Assinatura_do_Reajuste IS NULL
+            GROUP BY r.Contrato
+            ORDER BY r.Contrato
+            """,
+            (sg,),
+        )
+        issues = cur.fetchall()
+        cur.close()
+
+    if not issues:
+        print(f"OK dbo.Dados_Reajuste: nenhum reajuste com data de assinatura nula (escopo {sg}).")
+        return 0
+
+    total_rows = sum(int(r[1]) for r in issues)
+    print(
+        f"ALERTA dbo.Dados_Reajuste: {total_rows:,} linha(s) com "
+        f"Data_da_Assinatura_do_Reajuste IS NULL em {len(issues):,} contrato(s) "
+        f"(escopo {sg}). Estas linhas serão inseridas no SUPRA sem data de assinatura."
+    )
+    for contract, cnt in issues[:20]:
+        print(f"  {contract}: {cnt} linha(s)")
+    if len(issues) > 20:
+        print(f"  ... e mais {len(issues) - 20} contrato(s)")
+    return 1
+
+
+# cmd_check_empenho_null_nota — alerta quando SIMDNIT tem empenhos sem Nota_de_Empenho
+# ---------------------------------------------------------------------------
+
+def cmd_check_empenho_null_nota() -> int:
+    load_env()
+    sg = get_setting("SIMDNIT_SCOPE_SG_UND_GESTORA", default="CGCONT") or "CGCONT"
+    sim_ep = simdnit_endpoint()
+
+    with connect_endpoint(sim_ep) as src_conn:
+        cur = src_conn.cursor()
+        cur.execute(
+            """
+            SELECT e.NU_CON_FORMATADO, COUNT(*) AS cnt
+            FROM dbo.Dados_Empenho e
+            WHERE e.NU_CON_FORMATADO IN (
+                SELECT NU_CON_FORMATADO FROM dbo.Dados_Contrato WHERE SG_UND_GESTORA = %s
+            )
+              AND e.NU_EMPENHO IS NULL
+            GROUP BY e.NU_CON_FORMATADO
+            ORDER BY e.NU_CON_FORMATADO
+            """,
+            (sg,),
+        )
+        issues = cur.fetchall()
+        cur.close()
+
+    if not issues:
+        print(f"OK dbo.Dados_Empenho: nenhum empenho com NU_EMPENHO nulo (escopo {sg}).")
+        return 0
+
+    total_rows = sum(int(r[1]) for r in issues)
+    print(
+        f"ALERTA dbo.Dados_Empenho: {total_rows:,} linha(s) com "
+        f"NU_EMPENHO IS NULL em {len(issues):,} contrato(s) "
+        f"(escopo {sg}). Estas linhas serão inseridas no SUPRA sem nota de empenho."
+    )
+    for contract, cnt in issues[:20]:
+        print(f"  {contract}: {cnt} linha(s)")
+    if len(issues) > 20:
+        print(f"  ... e mais {len(issues) - 20} contrato(s)")
+    return 1
+
+
+# ---------------------------------------------------------------------------
 def cmd_run_all() -> int:
     """Executa todas as regras habilitadas em import_rules.json, depois compare --detail.
 
@@ -604,7 +783,10 @@ def cmd_run_all() -> int:
         print(f"[Regra {idx}/{total}] {rule_name}...", flush=True)
 
         try:
-            argv = [sys.executable, "-m", "supra_db_update"] + shlex.split(sub_cmd)
+            if getattr(sys, "frozen", False):
+                argv = [sys.executable] + shlex.split(sub_cmd)
+            else:
+                argv = [sys.executable, "-m", "supra_db_update"] + shlex.split(sub_cmd)
             result = subprocess.run(
                 argv,
                 capture_output=True,
@@ -1332,7 +1514,9 @@ def cmd_apply(
                     print(f"\n  [AVISO] {tc.table_supra} não encontrada no mapeamento; ignorando.")
                     continue
 
-                print(f"\n[{tc.id}] {tc.table_supra}  —  {len(contracts)} contrato(s)")
+                n_ignored = sum(1 for c in tc.contracts if c.is_ignored)
+                print(f"\n[{tc.id}] {tc.table_supra}  —  {len(contracts)} contrato(s)" +
+                      (f"  ({n_ignored} ignorado(s) — SUPRA já correto)" if n_ignored else ""))
 
                 def _progress(done: int, total: int) -> None:
                     pct = int(done / total * 100) if total else 100
@@ -1635,6 +1819,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verifica integridade por contrato: SIMDNIT não perdeu linhas que SUPRA já tem",
     )
     cdi.set_defaults(_run=lambda _: cmd_check_data_integrity())
+
+    # check-reajuste-null-date
+    crnd = sub.add_parser(
+        "check-reajuste-null-date",
+        help="Alerta quando dbo.Dados_Reajuste tem linhas com Data_da_Assinatura_do_Reajuste IS NULL",
+    )
+    crnd.set_defaults(_run=lambda _: cmd_check_reajuste_null_date())
+
+    # check-empenho-null-nota
+    cenn = sub.add_parser(
+        "check-empenho-null-nota",
+        help="Alerta quando dbo.Dados_Empenho tem linhas com NU_EMPENHO IS NULL",
+    )
+    cenn.set_defaults(_run=lambda _: cmd_check_empenho_null_nota())
 
     # run-all
     ra = sub.add_parser(

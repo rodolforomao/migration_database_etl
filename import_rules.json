@@ -55,6 +55,20 @@
       "description": "Per-contract row count check for TB_SIAC_EMPENHO, TB_SIAC_MEDICAO_MAIOR and TB_SIAC_REAJUSTE: alerts when SIMDNIT has fewer rows than SUPRA for any individual contract (possible erroneous deletion or modification in SIMDNIT).",
       "command": "check-data-integrity",
       "enabled": true
+    },
+    {
+      "id": "reajuste-null-date",
+      "name": "Reajuste: data de assinatura não nula",
+      "description": "Verifica se dbo.Dados_Reajuste (SIMDNIT) possui linhas com Data_da_Assinatura_do_Reajuste IS NULL no escopo CGCONT. Linhas com data nula serão inseridas no SUPRA sem data de assinatura, o que pode indicar dado inválido.",
+      "command": "check-reajuste-null-date",
+      "enabled": true
+    },
+    {
+      "id": "empenho-null-nota",
+      "name": "Empenho: Nota_de_Empenho não nula",
+      "description": "Verifica se dbo.Dados_Empenho (SIMDNIT) possui linhas com NU_EMPENHO IS NULL no escopo CGCONT. Linhas sem nota de empenho serão inseridas no SUPRA sem identificador, tornando os registros inválidos.",
+      "command": "check-empenho-null-nota",
+      "enabled": true
     }
   ],
   "table_contracts": {

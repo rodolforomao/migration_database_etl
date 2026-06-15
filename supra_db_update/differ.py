@@ -82,6 +82,8 @@ class RowDiff:
     common: int            # linhas idênticas nos dois lados
     error: str = ""
     warning: str = ""      # mapeamento insuficiente para diff preciso
+    sim_raw: list[tuple] = field(default_factory=list)    # linhas brutas do SIMDNIT (antes de dedup)
+    supra_raw: list[tuple] = field(default_factory=list)  # linhas brutas do SUPRA (antes de dedup)
 
 
 def diff_rows_for_contract(
@@ -165,7 +167,8 @@ def diff_rows_for_contract(
             f"SELECT {all_sim_cols} FROM {from_sim} WHERE {sim_jcol} = %s AND {where_scope}",
             (contract, *scope_params),
         )
-        sim_rows: set[tuple] = {tuple(r) for r in src_cur.fetchall()}
+        sim_raw_list: list[tuple] = [tuple(r) for r in src_cur.fetchall()]
+        sim_rows: set[tuple] = set(sim_raw_list)
 
         # ── lado SUPRA ───────────────────────────────────────────────────────
         supra_col_exprs = [_br(p.supra) for p in data_pairs] + [_br(sc) for (sc, _, _) in ej_cols]
@@ -174,7 +177,8 @@ def diff_rows_for_contract(
             f"SELECT {col_list_supra} FROM {pair.supra_table} WHERE {jcol_supra} = %s",
             (contract,),
         )
-        supra_rows: set[tuple] = {tuple(r) for r in dst_cur.fetchall()}
+        supra_raw_list: list[tuple] = [tuple(r) for r in dst_cur.fetchall()]
+        supra_rows: set[tuple] = set(supra_raw_list)
 
         all_col_names = [p.supra for p in data_pairs] + [sc for (sc, _, _) in ej_cols]
 
@@ -211,6 +215,8 @@ def diff_rows_for_contract(
             added=sorted(added_real,   key=_sort_key),
             removed=sorted(removed_real, key=_sort_key),
             common=common_exact + phantom,
+            sim_raw=sim_raw_list,
+            supra_raw=supra_raw_list,
         )
     except Exception as exc:
         return RowDiff(

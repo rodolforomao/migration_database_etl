@@ -1217,6 +1217,7 @@
       "enabled": true,
       "supra": "dbo.TB_SIAC_EMPENHO",
       "simdnit": "dbo.Dados_Empenho",
+      "sub_key_supra": "nota_empenho",
       "comment": "mapeamento manual concluído — data_emissao_empenho pendente (DT_DIA vs DT_CORRENTE)",
       "columns": [
         {
@@ -1307,6 +1308,7 @@
       "enabled": true,
       "supra": "dbo.TB_SIAC_EMPENHO_CONTA_CORRENTE",
       "simdnit": "dbo.Dados_Empenho",
+      "sub_key_supra": "Nota_de_Empenho",
       "comment": "9 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
       "columns": [
         {
@@ -1320,14 +1322,14 @@
           "note": ""
         },
         {
-          "enabled": false,
+          "enabled": true,
           "supra_col": "Nota_de_Empenho",
           "supra_type": "nvarchar",
           "simdnit_col": "NU_EMPENHO",
           "simdnit_type": null,
           "is_join_key": false,
           "source": "manual",
-          "note": ""
+          "note": "habilitado — identificador único do empenho por contrato"
         },
         {
           "enabled": true,
@@ -1423,6 +1425,7 @@
       "enabled": true,
       "supra": "dbo.TB_SIAC_EMPENHO_ORG",
       "simdnit": "dbo.Dados_Empenho",
+      "sub_key_supra": "nota_empenho",
       "comment": "7 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
       "columns": [
         {
@@ -1723,6 +1726,7 @@
       "enabled": true,
       "supra": "dbo.TB_SIAC_MEDICAO_MAIOR",
       "simdnit": "dbo.Dados_Medicao",
+      "sub_key_supra": "nume_medicao",
       "comment": "4 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
       "columns": [
         {
@@ -1793,6 +1797,7 @@
       "enabled": true,
       "supra": "dbo.TB_SIAC_MEDICAO_MAIOR_ORG",
       "simdnit": "dbo.Dados_Medicao",
+      "sub_key_supra": "nume_medicao",
       "comment": "5 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
       "columns": [
         {
@@ -1943,6 +1948,7 @@
       "enabled": true,
       "supra": "dbo.TB_SIAC_REAJUSTE",
       "simdnit": "dbo.Dados_Reajuste",
+      "sub_key_supra": "numero_do_reajuste",
       "comment": "",
       "columns": [
         {
@@ -2333,6 +2339,7 @@
       "enabled": true,
       "supra": "dbo.TB_SIAC_TERMO_ADITIVO",
       "simdnit": "dbo.Dados_Aditivo",
+      "sub_key_supra": "numero_aditivo",
       "comment": "8 coluna(s) sem correspondência — preencha 'simdnit_col' para incluir no sync.",
       "columns": [
         {

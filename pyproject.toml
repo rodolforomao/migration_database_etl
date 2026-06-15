@@ -9,7 +9,6 @@ requires-python = ">=3.12"
 dependencies = [
     "python-dotenv>=1.0.0",
     "pymssql>=2.3.0",
-    "PyYAML>=6.0",
 ]
 
 [project.scripts]

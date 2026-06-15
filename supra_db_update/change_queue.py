@@ -34,6 +34,7 @@ class ContractChange:
     simdnit_count: int
     supra_count: int
     accepted: bool | None = None  # None=pendente  True=aceito  False=rejeitado
+    accepted_mode: str | None = None  # "ignorar" | "force" | None
     note: str = ""
 
     @property
@@ -41,7 +42,13 @@ class ContractChange:
         return self.simdnit_count - self.supra_count
 
     @property
+    def is_ignored(self) -> bool:
+        return self.accepted is True and self.accepted_mode == "ignorar"
+
+    @property
     def status_label(self) -> str:
+        if self.accepted is True and self.accepted_mode == "ignorar":
+            return "IGNORADO"
         if self.accepted is True:
             return "ACEITO"
         if self.accepted is False:
@@ -65,12 +72,12 @@ class TableChange:
 
     @property
     def effective_contracts(self) -> list[ContractChange]:
-        """Contratos efectivamente aceitos (respeitando override de tabela)."""
+        """Contratos aceitos que serão sincronizados (exclui os marcados como 'ignorar')."""
         if self.accepted is True:
-            return self.contracts
+            return [c for c in self.contracts if not c.is_ignored]
         if self.accepted is False:
             return []
-        return [c for c in self.contracts if c.accepted is True]
+        return [c for c in self.contracts if c.accepted is True and not c.is_ignored]
 
     @property
     def effective_contract_numbers(self) -> list[str]:
@@ -184,6 +191,7 @@ def _contract_to_dict(c: ContractChange) -> dict:
         "simdnit_count": c.simdnit_count,
         "supra_count": c.supra_count,
         "accepted": c.accepted,
+        "accepted_mode": c.accepted_mode,
         "note": c.note,
     }
 
@@ -236,6 +244,7 @@ def load_changeset(path: Path = DEFAULT_PATH) -> ChangeSet:
                 simdnit_count=c["simdnit_count"],
                 supra_count=c["supra_count"],
                 accepted=c.get("accepted"),
+                accepted_mode=c.get("accepted_mode"),
                 note=c.get("note", ""),
             )
             for c in t.get("contracts", [])

@@ -24,9 +24,13 @@ IMAGE="python:3.12-slim"
 echo "==> Imagem de build: $IMAGE"
 docker pull --quiet "$IMAGE"
 
+PIP_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/pip"
+mkdir -p "$PIP_CACHE"
+
 echo "==> Compilando dentro do container..."
 docker run --rm \
   -v "$SCRIPT_DIR:/project" \
+  -v "$PIP_CACHE:/root/.cache/pip" \
   "$IMAGE" \
   bash -c "
     set -euo pipefail
@@ -38,8 +42,8 @@ docker run --rm \
     echo 'OK'
 
     echo '--- [2/5] Dependências Python ---'
-    pip install --quiet \
-      pymssql python-dotenv pyyaml pyinstaller staticx
+    pip install --quiet --timeout 120 --retries 5 \
+      pymssql python-dotenv pyinstaller staticx
 
     echo '--- [3/5] Expondo o pacote do projeto ---'
     export PYTHONPATH=/project
@@ -50,7 +54,6 @@ docker run --rm \
       --name supra_db_update \
       --hidden-import supra_db_update._paths \
       --hidden-import pymssql \
-      --hidden-import yaml \
       --hidden-import dotenv \
       --distpath /project/dist \
       --workpath /tmp/pyinstaller_build \
@@ -61,6 +64,7 @@ docker run --rm \
     echo '--- [5/5] staticx — tornando o binário independente de glibc ---'
     staticx /project/dist/supra_db_update /project/dist/supra_db_update_static
     mv /project/dist/supra_db_update_static /project/dist/supra_db_update
+    chmod 755 /project/dist/supra_db_update
     echo 'OK'
 
     echo '--- glibc requerida (deve ser vazio ou apenas GLIBC_2.0) ---'

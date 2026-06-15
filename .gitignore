@@ -32,3 +32,6 @@ reports/
 .DS_Store
 Thumbs.db
 jobs/
+
+column_mapping.json
+import_rules.json

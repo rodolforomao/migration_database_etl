@@ -146,16 +146,18 @@ def count_rows_in(
 
 
 def _fetch_scope_contracts(source: pymssql.Cursor, sg: str) -> "list[str]":
-    """Retorna a lista de NU_CON_FORMATADO dos contratos no escopo SG_UND_GESTORA no SIMDNIT.
+    """Retorna a lista ÚNICA de NU_CON_FORMATADO dos contratos no escopo SG_UND_GESTORA no SIMDNIT.
 
     Usada para aplicar o mesmo escopo CGCONT ao lado SUPRA (via IN-list),
     tornando a comparação de contagens apples-to-apples.
+    DISTINCT garante que contratos duplicados em Dados_Contrato não causem
+    dupla-contagem em count_rows_in (que soma COUNT por chunk de IN-list).
     """
     if not sg:
         return []
     try:
         source.execute(
-            "SELECT [NU_CON_FORMATADO] FROM [dbo].[Dados_Contrato] "
+            "SELECT DISTINCT [NU_CON_FORMATADO] FROM [dbo].[Dados_Contrato] "
             "WHERE [SG_UND_GESTORA] = %s",
             (sg,),
         )
@@ -350,7 +352,51 @@ def _check_no_1900_date_regression(
 
         regressed.sort(key=lambda x: x["diferenca"], reverse=True)
 
+        # busca valores reais de data para cada contrato com regressão (até _VAL_SAMPLE por lado)
+        _VAL_SAMPLE = 5
+        regressed_cons = [r["contrato"] for r in regressed[:_SAMPLE]]
+        supra_vals: dict[str, list[str]] = {}
+        sim_vals: dict[str, list[str]] = {}
+        for chunk in _chunks(regressed_cons, _CHUNK):
+            ph = ",".join(["%s"] * len(chunk))
+            try:
+                target.execute(
+                    f"SELECT {j_supra}, {sc} FROM {contract.supra_table} "
+                    f"WHERE {j_supra} IN ({ph}) AND {sc} IS NOT NULL AND YEAR({sc}) != 1900 "
+                    f"ORDER BY {j_supra}",
+                    chunk,
+                )
+                for r2 in target.fetchall():
+                    k = str(r2[0])
+                    lst = supra_vals.setdefault(k, [])
+                    if len(lst) < _VAL_SAMPLE:
+                        lst.append(str(r2[1]) if r2[1] is not None else "NULL")
+            except Exception:
+                pass
+            try:
+                source.execute(
+                    f"SELECT {j_sim}, {mc} FROM {contract.simdnit_table} "
+                    f"WHERE {j_sim} IN ({ph}) "
+                    f"ORDER BY {j_sim}",
+                    chunk,
+                )
+                for r2 in source.fetchall():
+                    k = str(r2[0])
+                    lst = sim_vals.setdefault(k, [])
+                    if len(lst) < _VAL_SAMPLE:
+                        lst.append(str(r2[1]) if r2[1] is not None else "NULL")
+            except Exception:
+                pass
+        for r in regressed:
+            cont = r["contrato"]
+            r["valor_supra"]   = ", ".join(supra_vals.get(cont, [])) or "—"
+            r["valor_simdnit"] = ", ".join(sim_vals.get(cont, []))   or "—"
+
         details[cp.supra] = {
+            "col_supra":     cp.supra,
+            "col_simdnit":   cp.simdnit,
+            "table_supra":   contract.supra_table,
+            "table_simdnit": contract.simdnit_table,
             "contratos_com_data_valida_no_supra": len(supra_counts),
             "contratos_com_regressao": len(regressed),
             "amostra": regressed[:_SAMPLE],
