@@ -1,5 +1,7 @@
 # ── Credenciais e configuração local ─────────────────────────────────────────
 .env
+.env_hom
+.env_prod
 *.env.local
 .claude/
 
