@@ -39,9 +39,16 @@ from supra_db_update.validators import (
     validate_table_contract,
 )
 
+import json as _json
+
 log = logging.getLogger(__name__)
 
 _COL_W = 46  # largura da coluna de nome de tabela na saída
+
+
+def _emit_rule_details(data: dict) -> None:
+    """Emite bloco JSON estruturado na última linha para parsing pelo frontend."""
+    print(f"__RULE_DETAILS_JSON__:{_json.dumps(data, ensure_ascii=False, separators=(',', ':'))}")
 
 
 # ---------------------------------------------------------------------------
@@ -496,6 +503,7 @@ def cmd_check_date_regression() -> int:
     targets = supra_targets_for_mode(pick_supra_mode())
 
     exit_code = 0
+    details_for_json: list[dict] = []
     with connect_endpoint(sim_ep) as src_conn:
         src_cur = src_conn.cursor()
         try:
@@ -513,10 +521,21 @@ def cmd_check_date_regression() -> int:
                             if not res.ok:
                                 exit_code = 1
                                 _print_alert_details(res.details)
+                                for col_det in res.details.values():
+                                    if isinstance(col_det, dict) and col_det.get("amostra"):
+                                        details_for_json.append({
+                                            "table_supra":   col_det.get("table_supra", contract.supra_table),
+                                            "col_supra":     col_det.get("col_supra", ""),
+                                            "col_simdnit":   col_det.get("col_simdnit", ""),
+                                            "contratos_com_regressao": col_det.get("contratos_com_regressao", 0),
+                                            "amostra":       col_det.get("amostra", []),
+                                        })
                     finally:
                         dst_cur.close()
         finally:
             src_cur.close()
+    if details_for_json:
+        _emit_rule_details({"type": "date_regression", "regressoes": details_for_json})
     return exit_code
 
 
@@ -554,11 +573,9 @@ def cmd_check_contract_values() -> int:
 
     print(f"FAIL dbo.Dados_Contrato: {len(rows)} contrato(s) com aritmética de valores inconsistente.")
     print(f"  (esperado: VALOR_INICIAL + VALOR_TOTAL_DE_REAJUSTE + VALOR_TOTAL_DE_ADITIVOS = VALOR_INICIAL_ADIT_REAJUSTES)")
-    _SAMPLE = 20
-    sample = list(rows[:_SAMPLE])
     header = ["contrato", "val_inicial", "val_reajuste", "val_aditivo", "val_ini_adit_reajuste"]
     col_w = [max(len(h), 10) for h in header]
-    for r in sample:
+    for r in rows[:20]:
         for i, v in enumerate(r):
             col_w[i] = min(40, max(col_w[i], len(str(v) if v is not None else "")))
     sep = "  +" + "+".join("-" * (w + 2) for w in col_w) + "+"
@@ -567,11 +584,25 @@ def cmd_check_contract_values() -> int:
     print(sep)
     print(_row_line(header))
     print(sep)
-    for r in sample:
+    for r in rows[:20]:
         print(_row_line(r))
     print(sep)
-    if len(rows) > _SAMPLE:
-        print(f"  ... e mais {len(rows) - _SAMPLE} contrato(s)")
+    if len(rows) > 20:
+        print(f"  ... e mais {len(rows) - 20} contrato(s)")
+    _emit_rule_details({
+        "type": "contract_values",
+        "total_contratos": len(rows),
+        "contratos": [
+            {
+                "contrato":             str(r[0] or ""),
+                "val_inicial":          str(r[1]) if r[1] is not None else "",
+                "val_reajuste":         str(r[2]) if r[2] is not None else "",
+                "val_aditivo":          str(r[3]) if r[3] is not None else "",
+                "val_ini_adit_reajuste": str(r[4]) if r[4] is not None else "",
+            }
+            for r in rows
+        ],
+    })
     return 1
 
 
@@ -680,10 +711,16 @@ def cmd_check_reajuste_null_date() -> int:
         f"Data_da_Assinatura_do_Reajuste IS NULL em {len(issues):,} contrato(s) "
         f"(escopo {sg}). Estas linhas serão inseridas no SUPRA sem data de assinatura."
     )
-    for contract, cnt in issues[:20]:
+    for contract, cnt in issues:
         print(f"  {contract}: {cnt} linha(s)")
-    if len(issues) > 20:
-        print(f"  ... e mais {len(issues) - 20} contrato(s)")
+    _emit_rule_details({
+        "type": "null_column",
+        "table": "dbo.Dados_Reajuste",
+        "column": "Data_da_Assinatura_do_Reajuste",
+        "total_rows": total_rows,
+        "total_contratos": len(issues),
+        "contratos": [{"contrato": str(r[0]), "linhas": int(r[1])} for r in issues],
+    })
     return 1
 
 
@@ -723,10 +760,16 @@ def cmd_check_empenho_null_nota() -> int:
         f"NU_EMPENHO IS NULL em {len(issues):,} contrato(s) "
         f"(escopo {sg}). Estas linhas serão inseridas no SUPRA sem nota de empenho."
     )
-    for contract, cnt in issues[:20]:
+    for contract, cnt in issues:
         print(f"  {contract}: {cnt} linha(s)")
-    if len(issues) > 20:
-        print(f"  ... e mais {len(issues) - 20} contrato(s)")
+    _emit_rule_details({
+        "type": "null_column",
+        "table": "dbo.Dados_Empenho",
+        "column": "NU_EMPENHO",
+        "total_rows": total_rows,
+        "total_contratos": len(issues),
+        "contratos": [{"contrato": str(r[0]), "linhas": int(r[1])} for r in issues],
+    })
     return 1
 
 
@@ -765,6 +808,7 @@ def cmd_run_all() -> int:
 
     dir_path = str(runtime_root())
     overall_ok = True
+    rule_alerts_for_json: list[dict] = []
 
     import subprocess
     import shlex
@@ -794,21 +838,51 @@ def cmd_run_all() -> int:
                 cwd=dir_path,
             )
             status  = "ok" if result.returncode == 0 else "erro"
-            output  = (result.stdout + result.stderr).strip().replace("\n", "\\n")
+            raw_out = result.stdout + result.stderr
+            output  = raw_out.strip().replace("\n", "\\n")
         except Exception as exc:
             status = "erro"
-            output = str(exc).replace("\n", "\\n")
+            raw_out = str(exc)
+            output = raw_out.replace("\n", "\\n")
 
         if status != "ok":
             overall_ok = False
+            # extrai bloco estruturado para a visualização de alertas
+            details = None
+            for line in raw_out.splitlines():
+                if line.startswith("__RULE_DETAILS_JSON__:"):
+                    try:
+                        details = _json.loads(line[len("__RULE_DETAILS_JSON__:"):])
+                    except Exception:
+                        pass
+                    break
+            if details is not None:
+                rule_alerts_for_json.append({
+                    "rule_id":   rule_id,
+                    "rule_name": rule_name,
+                    "details":   details,
+                })
 
         print(f"RULE:{rule_id}:{status}:{output}", flush=True)
 
     print("RULES_DONE", flush=True)
     print("Iniciando comparação SIMDNIT↔SUPRA...", flush=True)
 
-    # Agora executa o compare --detail (saída inline)
+    # Executa o compare --detail (saída inline)
     cmp_code = cmd_compare(tables=[], mapping=None, deep=False, detail=True)
+
+    # Post-processa pending_changes.json para adicionar rule_alerts (alertas de regras)
+    json_path = runtime_root() / "pending_changes.json"
+    if json_path.is_file():
+        try:
+            with json_path.open(encoding="utf-8") as f:
+                pj = _json.load(f)
+            pj["rule_alerts"] = rule_alerts_for_json
+            with json_path.open("w", encoding="utf-8") as f:
+                _json.dump(pj, f, ensure_ascii=False)
+        except Exception:
+            pass
+
     return 0 if (overall_ok and cmp_code == 0) else 1
 
 
@@ -1755,6 +1829,309 @@ def cmd_navigate(
 
 
 # ---------------------------------------------------------------------------
+# Subcomandos web (substituem scripts/web_*.py — rodados via binário)
+# ---------------------------------------------------------------------------
+
+def _web_safe(v) -> "str | None":
+    if v is None:
+        return None
+    try:
+        return str(v)
+    except Exception:
+        return repr(v)
+
+
+def _web_row_sort_key(row) -> list:
+    result = []
+    for v in row:
+        s = str(v) if v is not None else ""
+        try:
+            result.append((0, float(s), ""))
+        except (ValueError, TypeError):
+            result.append((1, 0.0, s))
+    return result
+
+
+def _web_mapping_meta(table_supra: str) -> dict:
+    from supra_db_update._paths import runtime_root
+    mapping_path = runtime_root() / "column_mapping.json"
+    if not mapping_path.exists():
+        return {"join_col": None, "disabled_mapped": [], "sub_key_supra": None}
+    try:
+        raw = _json.loads(mapping_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"join_col": None, "disabled_mapped": [], "sub_key_supra": None}
+
+    tbl_key = table_supra.lower()
+    for tbl in raw.get("tables", []):
+        supra_val = ""
+        for k, v in tbl.items():
+            if k.lower() in ("supra", "supra_table") and isinstance(v, str):
+                supra_val = v
+                break
+        if supra_val.lower() != tbl_key:
+            continue
+        join_col = None
+        disabled_mapped: list[dict] = []
+        sub_key_supra = tbl.get("sub_key_supra") or None
+        for col in tbl.get("columns", []):
+            simdnit_col = col.get("simdnit_col")
+            supra_col = col.get("supra_col")
+            if not simdnit_col or not supra_col:
+                continue
+            if col.get("is_join_key"):
+                join_col = {"supra": supra_col, "simdnit": simdnit_col}
+            elif not col.get("enabled", True):
+                disabled_mapped.append({"supra": supra_col, "simdnit": simdnit_col})
+        return {"join_col": join_col, "disabled_mapped": disabled_mapped, "sub_key_supra": sub_key_supra}
+    return {"join_col": None, "disabled_mapped": [], "sub_key_supra": None}
+
+
+def cmd_web_connection_info() -> int:
+    load_env()
+    try:
+        src = simdnit_endpoint()
+        tgt = supra_targets_for_mode(pick_supra_mode())[0]
+        print(_json.dumps({
+            "simdnit": {"label": src.label, "host": src.host, "port": src.port, "database": src.database},
+            "supra":   {"label": tgt.label, "host": tgt.host, "port": tgt.port, "database": tgt.database},
+        }))
+    except Exception as e:
+        print(_json.dumps({"erro": str(e)}))
+    return 0
+
+
+def cmd_web_diff_contrato(contract_id: str, limit: int, json_path_str: str | None) -> int:
+    from supra_db_update._paths import runtime_root
+    load_env()
+
+    if json_path_str:
+        json_path = Path(json_path_str).resolve()
+    else:
+        json_path = runtime_root() / "pending_changes.json"
+    if not json_path.exists():
+        print(_json.dumps({"erro": "pending_changes.json não encontrado"}, ensure_ascii=False))
+        return 1
+
+    cs = load_changeset(json_path)
+    contract_change = cs.get_contract(contract_id)
+    if not contract_change:
+        print(_json.dumps({"erro": f"Contrato {contract_id!r} não encontrado"}, ensure_ascii=False))
+        return 1
+
+    table_change = cs.get_table(contract_change.table_id)
+    if not table_change:
+        print(_json.dumps({"erro": f"Tabela {contract_change.table_id!r} não encontrada"}, ensure_ascii=False))
+        return 1
+
+    pairs = load_table_map()
+    pair = next((p for p in pairs if p.supra_table.lower() == table_change.table_supra.lower()), None)
+    if not pair:
+        print(_json.dumps({
+            "erro": f"Mapeamento de colunas não encontrado para {table_change.table_supra}",
+            "contract_id": contract_id,
+            "contract":    contract_change.contract,
+            "table_supra": table_change.table_supra,
+            "action":      contract_change.action,
+            "cols": [], "added": [], "added_total": 0,
+            "removed": [], "removed_total": 0, "common": 0,
+            "warning": "", "error": f"Sem mapeamento para {table_change.table_supra}",
+        }, ensure_ascii=False))
+        return 1
+
+    sg      = get_setting("SIMDNIT_SCOPE_SG_UND_GESTORA", default="CGCONT") or "CGCONT"
+    sim_ep  = simdnit_endpoint()
+    mode    = pick_supra_mode()
+    targets = supra_targets_for_mode(mode)
+
+    try:
+        with connect_endpoint(sim_ep) as src_conn, connect_endpoint(targets[0]) as dst_conn:
+            rd = diff_rows_for_contract(
+                src_conn.cursor(), dst_conn.cursor(), pair, contract_change.contract, sg,
+            )
+    except Exception as exc:
+        print(_json.dumps({
+            "contract_id": contract_id,
+            "contract":    contract_change.contract,
+            "table_supra": table_change.table_supra,
+            "action":      contract_change.action,
+            "cols": [], "added": [], "added_total": 0,
+            "removed": [], "removed_total": 0, "common": 0,
+            "warning": "", "error": str(exc),
+        }, ensure_ascii=False))
+        return 1
+
+    count_mismatch = (
+        len(rd.added) == 0 and len(rd.removed) == 0
+        and contract_change.simdnit_count != contract_change.supra_count
+    )
+    raw_limit = min(limit, 50)
+    full_meta = _web_mapping_meta(table_change.table_supra)
+    meta = full_meta if count_mismatch else {"join_col": None, "disabled_mapped": [], "sub_key_supra": full_meta["sub_key_supra"]}
+
+    mismatch_analysis: dict = {}
+    if count_mismatch and rd.sim_raw:
+        sim_set   = set(rd.sim_raw)
+        supra_set = set(rd.supra_raw)
+        sim_dupes     = len(rd.sim_raw) - len(sim_set)
+        genuinely_new = sorted(sim_set - supra_set, key=_web_row_sort_key)
+        supra_only    = sorted(supra_set - sim_set, key=_web_row_sort_key)
+        dupe_sample   = sorted(sim_set,             key=_web_row_sort_key)
+        sim_raw_sorted   = sorted(rd.sim_raw,   key=_web_row_sort_key)
+        supra_raw_sorted = sorted(rd.supra_raw, key=_web_row_sort_key)
+        mismatch_analysis = {
+            "simdnit_total":     len(rd.sim_raw),
+            "simdnit_unique":    len(sim_set),
+            "simdnit_dupes":     sim_dupes,
+            "supra_total":       len(rd.supra_raw),
+            "supra_unique":      len(supra_set),
+            "genuinely_new":     len(genuinely_new),
+            "supra_only":        len(supra_only),
+            "new_rows":          [[_web_safe(v) for v in r] for r in genuinely_new[:raw_limit]],
+            "old_rows":          [[_web_safe(v) for v in r] for r in supra_only[:raw_limit]],
+            "dupe_sample":       [[_web_safe(v) for v in r] for r in dupe_sample[:raw_limit]],
+            "sim_raw_sorted":    [[_web_safe(v) for v in r] for r in sim_raw_sorted[:raw_limit]],
+            "supra_raw_sorted":  [[_web_safe(v) for v in r] for r in supra_raw_sorted[:raw_limit]],
+        }
+
+    _NULL_WARN: dict[str, list[str]] = {
+        "dbo.tb_siac_reajuste":               ["data_da_assinatura_do_reajuste"],
+        "dbo.tb_siac_empenho_conta_corrente":  ["Nota_de_Empenho"],
+    }
+    table_key = table_change.table_supra.lower()
+    critical_cols = _NULL_WARN.get(table_key, [])
+    cols_lower = [c.lower() for c in rd.cols]
+    warn_null_col_indices = [
+        cols_lower.index(cc.lower())
+        for cc in critical_cols
+        if cc.lower() in cols_lower
+    ]
+    null_warn_rows = []
+    if warn_null_col_indices and rd.added:
+        for ri, row in enumerate(rd.added[:limit]):
+            for ci in warn_null_col_indices:
+                if ci < len(row) and row[ci] is None:
+                    null_warn_rows.append(ri)
+                    break
+
+    result = {
+        "contract_id":        contract_id,
+        "contract":           contract_change.contract,
+        "table_supra":        table_change.table_supra,
+        "table_simdnit":      pair.simdnit_table,
+        "simdnit_host":       sim_ep.host,
+        "simdnit_port":       sim_ep.port,
+        "simdnit_database":   sim_ep.database,
+        "simdnit_label":      sim_ep.label,
+        "action":             contract_change.action,
+        "simdnit_count":      contract_change.simdnit_count,
+        "supra_count":        contract_change.supra_count,
+        "cols":               rd.cols,
+        "added":              [[_web_safe(v) for v in row] for row in rd.added[:limit]],
+        "added_total":        len(rd.added),
+        "removed":            [[_web_safe(v) for v in row] for row in rd.removed[:limit]],
+        "removed_total":      len(rd.removed),
+        "common":             rd.common,
+        "warning":            rd.warning,
+        "error":              rd.error,
+        "truncated":          len(rd.added) > limit or len(rd.removed) > limit,
+        "sim_raw":   ([[_web_safe(v) for v in r] for r in sorted(rd.sim_raw,   key=_web_row_sort_key)[:raw_limit]] if count_mismatch else []),
+        "supra_raw": ([[_web_safe(v) for v in r] for r in sorted(rd.supra_raw, key=_web_row_sort_key)[:raw_limit]] if count_mismatch else []),
+        "warn_null_col_idx":  warn_null_col_indices,
+        "null_warn_rows":     null_warn_rows,
+        "mapping_join_col":   meta["join_col"],
+        "mapping_disabled":   meta["disabled_mapped"],
+        "sub_key_supra":      meta["sub_key_supra"],
+        "mismatch_analysis":  mismatch_analysis,
+    }
+    print(_json.dumps(result, ensure_ascii=False, default=str))
+    return 0
+
+
+def cmd_web_analise_duplicatas(table_id: str, limit: int, json_path_str: str | None) -> int:
+    from supra_db_update._paths import runtime_root
+    load_env()
+
+    if json_path_str:
+        json_path = Path(json_path_str).resolve()
+    else:
+        json_path = runtime_root() / "pending_changes.json"
+
+    if not json_path.exists():
+        print(_json.dumps({"erro": "pending_changes.json não encontrado"}, ensure_ascii=False))
+        return 1
+
+    cs = load_changeset(json_path)
+    table_change = cs.get_table(table_id)
+    if not table_change:
+        print(_json.dumps({"erro": f"Tabela {table_id!r} não encontrada"}, ensure_ascii=False))
+        return 1
+
+    candidates = [
+        c for c in table_change.contracts
+        if c.action == "D/I" and c.simdnit_count != c.supra_count
+    ]
+
+    pairs = load_table_map()
+    pair = next((p for p in pairs if p.supra_table.lower() == table_change.table_supra.lower()), None)
+    if not pair:
+        print(_json.dumps({"erro": f"Mapeamento não encontrado para {table_change.table_supra}"}, ensure_ascii=False))
+        return 1
+
+    sg      = get_setting("SIMDNIT_SCOPE_SG_UND_GESTORA", default="CGCONT") or "CGCONT"
+    sim_ep  = simdnit_endpoint()
+    mode    = pick_supra_mode()
+    targets = supra_targets_for_mode(mode)
+
+    results: list[dict] = []
+    if candidates:
+        with connect_endpoint(sim_ep) as src_conn, connect_endpoint(targets[0]) as dst_conn:
+            for cc in candidates:
+                try:
+                    rd = diff_rows_for_contract(
+                        src_conn.cursor(), dst_conn.cursor(), pair, cc.contract, sg
+                    )
+                except Exception as exc:
+                    results.append({"contract": cc.contract, "erro": str(exc)})
+                    continue
+
+                if not rd.sim_raw:
+                    continue
+
+                sim_set   = set(rd.sim_raw)
+                supra_set = set(rd.supra_raw)
+                sim_dupes     = len(rd.sim_raw) - len(sim_set)
+                genuinely_new = len(sim_set - supra_set)
+                supra_only    = len(supra_set - sim_set)
+
+                if sim_dupes > 0 and genuinely_new == 0 and supra_only == 0:
+                    dupe_sample    = sorted(sim_set,    key=_web_row_sort_key)
+                    sim_raw_sorted = sorted(rd.sim_raw, key=_web_row_sort_key)
+                    results.append({
+                        "contract":       cc.contract,
+                        "simdnit_total":  len(rd.sim_raw),
+                        "simdnit_unique": len(sim_set),
+                        "simdnit_dupes":  sim_dupes,
+                        "cols":           rd.cols,
+                        "sim_raw":        [[_web_safe(v) for v in r] for r in sim_raw_sorted[:limit]],
+                        "dupe_sample":    [[_web_safe(v) for v in r] for r in dupe_sample[:limit]],
+                    })
+
+    print(_json.dumps({
+        "table_id":          table_id,
+        "table_supra":       table_change.table_supra,
+        "table_simdnit":     pair.simdnit_table,
+        "simdnit_host":      sim_ep.host,
+        "simdnit_port":      sim_ep.port,
+        "simdnit_database":  sim_ep.database,
+        "simdnit_label":     sim_ep.label,
+        "total_candidates":  len(candidates),
+        "results":           results,
+    }, ensure_ascii=False, default=str))
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
 
@@ -2018,6 +2395,24 @@ def build_parser() -> argparse.ArgumentParser:
     nav.set_defaults(
         _run=lambda a: cmd_navigate(a.path, a.mapping, a.filter_table, a.filter_contracts, a.limit)
     )
+
+    # web-connection-info
+    wci = sub.add_parser("web-connection-info", help="Retorna info de conexão como JSON (uso interno web)")
+    wci.set_defaults(_run=lambda _: cmd_web_connection_info())
+
+    # web-diff-contrato
+    wdc = sub.add_parser("web-diff-contrato", help="Diff JSON de um contrato para a interface web")
+    wdc.add_argument("--contract-id", required=True, help="ID do contrato (ex: C0001)")
+    wdc.add_argument("--limit", type=int, default=200, help="Máximo de linhas por seção")
+    wdc.add_argument("--json-path", default=None, help="Caminho para pending_changes.json")
+    wdc.set_defaults(_run=lambda a: cmd_web_diff_contrato(a.contract_id, a.limit, a.json_path))
+
+    # web-analise-duplicatas
+    wad = sub.add_parser("web-analise-duplicatas", help="Analisa duplicatas SIMDNIT para uma tabela (uso interno web)")
+    wad.add_argument("--table-id", required=True, help="ID da tabela (ex: T03)")
+    wad.add_argument("--limit", type=int, default=50, help="Máximo de linhas brutas por contrato")
+    wad.add_argument("--json-path", default=None, help="Caminho para pending_changes.json")
+    wad.set_defaults(_run=lambda a: cmd_web_analise_duplicatas(a.table_id, a.limit, a.json_path))
 
     # inspect
     ins = sub.add_parser(
