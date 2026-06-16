@@ -4,71 +4,125 @@
       "id": "connections",
       "name": "Check Connections",
       "description": "Tests connectivity to SIMDNIT and SUPRA databases before any other check",
+      "type": "command",
       "command": "test-connections",
       "enabled": true
     },
     {
       "id": "count-medicoes",
       "name": "Medições: SIMDNIT >= SUPRA",
-      "description": "Checks that SIMDNIT has at least as many measurement records as SUPRA (TB_SIAC_MEDICAO_MAIOR). Blocks if SIMDNIT lost rows.",
+      "description": "Checks that SIMDNIT has at least as many measurement records as SUPRA (TB_SIAC_MEDICAO_MAIOR).",
+      "type": "command",
       "command": "check-counts --table dbo.TB_SIAC_MEDICAO_MAIOR",
       "enabled": true
     },
     {
       "id": "count-contratos",
       "name": "Contratos: SIMDNIT >= SUPRA",
-      "description": "Checks that SIMDNIT has at least as many contract records as SUPRA (TB_SIAC_CONTRATO). Blocks if SIMDNIT lost rows.",
+      "description": "Checks that SIMDNIT has at least as many contract records as SUPRA (TB_SIAC_CONTRATO).",
+      "type": "command",
       "command": "check-counts --table dbo.TB_SIAC_CONTRATO",
       "enabled": true
     },
     {
       "id": "count-aditivos",
       "name": "Aditivos: SIMDNIT >= SUPRA",
-      "description": "Checks that SIMDNIT has at least as many additive term records as SUPRA (TB_SIAC_TERMO_ADITIVO). Blocks if SIMDNIT lost rows.",
+      "description": "Checks that SIMDNIT has at least as many additive term records as SUPRA (TB_SIAC_TERMO_ADITIVO).",
+      "type": "command",
       "command": "check-counts --table dbo.TB_SIAC_TERMO_ADITIVO",
       "enabled": true
     },
     {
       "id": "count-empenhos",
       "name": "Empenhos: SIMDNIT >= SUPRA",
-      "description": "Checks that SIMDNIT has at least as many commitment records as SUPRA (TB_SIAC_EMPENHO). Blocks if SIMDNIT lost rows.",
+      "description": "Checks that SIMDNIT has at least as many commitment records as SUPRA (TB_SIAC_EMPENHO).",
+      "type": "command",
       "command": "check-counts --table dbo.TB_SIAC_EMPENHO",
       "enabled": true
     },
     {
       "id": "date-regression",
       "name": "Date Regression (1900)",
-      "description": "For all configured tables: checks that valid dates in SUPRA (year != 1900) have not been replaced by 1900 in SIMDNIT. Covers contracts, measurements, additive terms and commitments.",
+      "description": "For all configured tables: checks that valid dates in SUPRA have not been replaced by 1900 in SIMDNIT.",
+      "type": "command",
       "command": "check-date-regression",
       "enabled": true
     },
     {
       "id": "contract-values",
       "name": "Contract Value Arithmetic",
-      "description": "In SIMDNIT (dbo.Dados_Contrato): checks that VALOR_INICIAL + VALOR_TOTAL_DE_REAJUSTE + VALOR_TOTAL_DE_ADITIVOS equals VALOR_INICIAL_ADIT_REAJUSTES. Reports contracts where this equation does not hold.",
-      "command": "check-contract-values",
-      "enabled": true
+      "description": "VALOR_INICIAL + VALOR_TOTAL_DE_REAJUSTE + VALOR_TOTAL_DE_ADITIVOS deve igualar VALOR_INICIAL_ADIT_REAJUSTES em dbo.Dados_Contrato.",
+      "type": "arithmetic",
+      "enabled": true,
+      "params": {
+        "simdnit_table": "dbo.Dados_Contrato",
+        "contract_col": "NU_CON_FORMATADO",
+        "scope_col": "SG_UND_GESTORA",
+        "operands": [
+          "VALOR_INICIAL",
+          "VALOR_TOTAL_DE_REAJUSTE",
+          "VALOR_TOTAL_DE_ADITIVOS"
+        ],
+        "result": "VALOR_INICIAL_ADIT_REAJUSTES",
+        "tolerance": 0.01
+      }
     },
     {
       "id": "data-integrity",
       "name": "SUPRA Data Integrity",
-      "description": "Per-contract row count check for TB_SIAC_EMPENHO, TB_SIAC_MEDICAO_MAIOR and TB_SIAC_REAJUSTE: alerts when SIMDNIT has fewer rows than SUPRA for any individual contract (possible erroneous deletion or modification in SIMDNIT).",
-      "command": "check-data-integrity",
-      "enabled": true
+      "description": "Por contrato: SIMDNIT deve ter >= linhas que SUPRA para Empenho, Medicao e Reajuste.",
+      "type": "row_count_per_contract",
+      "enabled": true,
+      "params": {
+        "pairs": [
+          {
+            "supra_table": "dbo.TB_SIAC_EMPENHO",
+            "simdnit_table": "dbo.Dados_Empenho",
+            "join_supra": "contrato",
+            "join_simdnit": "NU_CON_FORMATADO"
+          },
+          {
+            "supra_table": "dbo.TB_SIAC_MEDICAO_MAIOR",
+            "simdnit_table": "dbo.Dados_Medicao",
+            "join_supra": "contrato",
+            "join_simdnit": "NU_CON_FORMATADO"
+          },
+          {
+            "supra_table": "dbo.TB_SIAC_REAJUSTE",
+            "simdnit_table": "dbo.Dados_Reajuste",
+            "join_supra": "contrato",
+            "join_simdnit": "Contrato"
+          }
+        ]
+      }
     },
     {
       "id": "reajuste-null-date",
       "name": "Reajuste: data de assinatura não nula",
-      "description": "Verifica se dbo.Dados_Reajuste (SIMDNIT) possui linhas com Data_da_Assinatura_do_Reajuste IS NULL no escopo CGCONT. Linhas com data nula serão inseridas no SUPRA sem data de assinatura, o que pode indicar dado inválido.",
-      "command": "check-reajuste-null-date",
-      "enabled": true
+      "description": "dbo.Dados_Reajuste não pode ter Data_da_Assinatura_do_Reajuste IS NULL no escopo CGCONT.",
+      "type": "null_column",
+      "enabled": true,
+      "params": {
+        "simdnit_table": "dbo.Dados_Reajuste",
+        "column": "Data_da_Assinatura_do_Reajuste",
+        "join_col": "Contrato",
+        "scope_table": "dbo.Dados_Contrato",
+        "scope_col": "SG_UND_GESTORA"
+      }
     },
     {
       "id": "empenho-null-nota",
       "name": "Empenho: Nota_de_Empenho não nula",
-      "description": "Verifica se dbo.Dados_Empenho (SIMDNIT) possui linhas com NU_EMPENHO IS NULL no escopo CGCONT. Linhas sem nota de empenho serão inseridas no SUPRA sem identificador, tornando os registros inválidos.",
-      "command": "check-empenho-null-nota",
-      "enabled": true
+      "description": "dbo.Dados_Empenho não pode ter NU_EMPENHO IS NULL no escopo CGCONT.",
+      "type": "null_column",
+      "enabled": true,
+      "params": {
+        "simdnit_table": "dbo.Dados_Empenho",
+        "column": "NU_EMPENHO",
+        "join_col": "NU_CON_FORMATADO",
+        "scope_table": "dbo.Dados_Contrato",
+        "scope_col": "SG_UND_GESTORA"
+      }
     }
   ],
   "table_contracts": {
@@ -87,8 +141,8 @@
       "join_simdnit": "NU_CON_FORMATADO",
       "rules": ["source_row_count_gte_target", "no_1900_date_regression"],
       "date_columns": [
-        {"supra": "data_termino_medicao",      "simdnit": "DT_TERMINO_MEDICAO"},
-        {"supra": "data_processamento_medicao", "simdnit": "DT_PROCESSAMENTO_MEDICAO"}
+        {"supra": "data_termino_medicao",       "simdnit": "DT_TERMINO_MEDICAO"},
+        {"supra": "data_processamento_medicao",  "simdnit": "DT_PROCESSAMENTO_MEDICAO"}
       ]
     },
     "dbo.TB_SIAC_TERMO_ADITIVO": {
@@ -107,12 +161,12 @@
       "join_simdnit": "NU_CON_FORMATADO",
       "rules": ["source_row_count_gte_target", "no_1900_date_regression"],
       "date_columns": [
-        {"supra": "dt_assinatura",     "simdnit": "DT_ASSINATURA"},
+        {"supra": "dt_assinatura",      "simdnit": "DT_ASSINATURA"},
         {"supra": "dt_termino_vigencia","simdnit": "DT_TERMINO_VIGENCIA"},
-        {"supra": "dt_aprovacao",      "simdnit": "DT_APROVACAO"},
-        {"supra": "dt_proposta",       "simdnit": "DT_PROPOSTA"},
-        {"supra": "dt_publicacao",     "simdnit": "DT_PUBLICACAO"},
-        {"supra": "dt_inicio",         "simdnit": "DT_INICIO"}
+        {"supra": "dt_aprovacao",       "simdnit": "DT_APROVACAO"},
+        {"supra": "dt_proposta",        "simdnit": "DT_PROPOSTA"},
+        {"supra": "dt_publicacao",      "simdnit": "DT_PUBLICACAO"},
+        {"supra": "dt_inicio",          "simdnit": "DT_INICIO"}
       ]
     }
   }

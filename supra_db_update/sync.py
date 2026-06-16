@@ -774,6 +774,196 @@ def cmd_check_empenho_null_nota() -> int:
 
 
 # ---------------------------------------------------------------------------
+# Handlers genéricos — dirigidos por params do import_rules.json
+# ---------------------------------------------------------------------------
+
+def _generic_null_column(
+    params: dict, sg: str, src_cur: "pymssql.Cursor"
+) -> "tuple[int, dict | None, str]":
+    """Verifica coluna IS NULL em tabela SIMDNIT, escopada por SG_UND_GESTORA."""
+    simdnit_table = params.get("simdnit_table", "")
+    column        = params.get("column", "")
+    join_col      = params.get("join_col", "NU_CON_FORMATADO")
+    scope_table   = params.get("scope_table", "dbo.Dados_Contrato")
+    scope_col     = params.get("scope_col", "SG_UND_GESTORA")
+
+    if not simdnit_table or not column:
+        return 1, None, "ERRO: params insuficientes (simdnit_table e column obrigatórios)"
+
+    _, scope_tbl = scope_table.split(".", 1)
+    lines: list[str] = []
+    try:
+        src_cur.execute(
+            f"SELECT t.[{join_col}], COUNT(*) AS cnt"
+            f" FROM {simdnit_table} t"
+            f" WHERE t.[{join_col}] IN ("
+            f"   SELECT [NU_CON_FORMATADO] FROM [dbo].[{scope_tbl}]"
+            f"   WHERE [{scope_col}] = %s"
+            f" ) AND t.[{column}] IS NULL"
+            f" GROUP BY t.[{join_col}]"
+            f" ORDER BY t.[{join_col}]",
+            (sg,),
+        )
+        issues = src_cur.fetchall()
+    except Exception as exc:
+        return 1, None, f"ERRO ao consultar {simdnit_table}: {exc}"
+
+    if not issues:
+        lines.append(f"OK {simdnit_table}: nenhuma linha com {column} nulo (escopo {sg}).")
+        return 0, None, "\n".join(lines)
+
+    total_rows = sum(int(r[1]) for r in issues)
+    lines.append(
+        f"ALERTA {simdnit_table}: {total_rows:,} linha(s) com {column} IS NULL"
+        f" em {len(issues):,} contrato(s) (escopo {sg})."
+    )
+    for contract, cnt in issues:
+        lines.append(f"  {contract}: {cnt} linha(s)")
+
+    details = {
+        "type":            "null_column",
+        "table":           simdnit_table,
+        "column":          column,
+        "total_rows":      total_rows,
+        "total_contratos": len(issues),
+        "contratos":       [{"contrato": str(r[0]), "linhas": int(r[1])} for r in issues],
+    }
+    return 1, details, "\n".join(lines)
+
+
+def _generic_arithmetic(
+    params: dict, sg: str, src_cur: "pymssql.Cursor"
+) -> "tuple[int, dict | None, str]":
+    """Verifica colA + colB + ... = result_col na tabela SIMDNIT."""
+    simdnit_table = params.get("simdnit_table", "")
+    contract_col  = params.get("contract_col", "NU_CON_FORMATADO")
+    scope_col     = params.get("scope_col", "")
+    operands      = params.get("operands", [])
+    result_col    = params.get("result", "")
+    tolerance     = float(params.get("tolerance", 0.01))
+
+    if not simdnit_table or not operands or not result_col:
+        return 1, None, "ERRO: params insuficientes (simdnit_table, operands, result obrigatórios)"
+
+    lines: list[str] = []
+    sum_expr = " + ".join(f"[{c}]" for c in operands)
+    cols_str = ", ".join(f"[{c}]" for c in operands)
+    formula  = " + ".join(operands) + f" = {result_col}"
+
+    tol_str = repr(float(tolerance))  # ex: '0.01' — embute direto no SQL evitando coerção
+    try:
+        if scope_col and sg:
+            src_cur.execute(
+                f"SELECT [{contract_col}], {cols_str}, [{result_col}]"
+                f" FROM {simdnit_table}"
+                f" WHERE [{scope_col}] = %s"
+                f"   AND [{result_col}] IS NOT NULL"
+                f"   AND ABS({sum_expr} - [{result_col}]) > {tol_str}",
+                (sg,),
+            )
+        else:
+            src_cur.execute(
+                f"SELECT [{contract_col}], {cols_str}, [{result_col}]"
+                f" FROM {simdnit_table}"
+                f" WHERE [{result_col}] IS NOT NULL"
+                f"   AND ABS({sum_expr} - [{result_col}]) > {tol_str}",
+            )
+        rows = src_cur.fetchall()
+    except Exception as exc:
+        return 1, {"type": "arithmetic", "error": str(exc)}, f"ERRO ao consultar {simdnit_table}: {exc}"
+
+    if not rows:
+        lines.append(f"OK {simdnit_table}: aritmética consistente ({formula}).")
+        return 0, None, "\n".join(lines)
+
+    lines.append(f"FAIL {simdnit_table}: {len(rows)} contrato(s) com aritmética inconsistente.")
+    lines.append(f"  (esperado: {formula})")
+    for r in rows[:20]:
+        lines.append("  " + " | ".join(str(v) if v is not None else "NULL" for v in r))
+    if len(rows) > 20:
+        lines.append(f"  ... e mais {len(rows) - 20} contrato(s)")
+
+    all_cols = [contract_col] + list(operands) + [result_col]
+    details = {
+        "type":            "arithmetic",
+        "table":           simdnit_table,
+        "formula":         formula,
+        "operands":        list(operands),
+        "result":          result_col,
+        "contract_col":    contract_col,
+        "total_contratos": len(rows),
+        "contratos": [
+            dict(zip(all_cols, [str(v) if v is not None else "" for v in r]))
+            for r in rows
+        ],
+    }
+    return 1, details, "\n".join(lines)
+
+
+def _generic_row_count_per_contract(
+    params: dict,
+    src_cur: "pymssql.Cursor",
+    dst_cur: "pymssql.Cursor",
+) -> "tuple[int, dict | None, str]":
+    """Por contrato: SIMDNIT deve ter >= linhas que SUPRA para cada par de tabelas."""
+    pairs = params.get("pairs", [])
+    if not pairs:
+        return 1, None, "ERRO: params insuficientes (pairs obrigatório)"
+
+    all_ok = True
+    for pair in pairs:
+        supra_t   = pair.get("supra_table", "")
+        simdnit_t = pair.get("simdnit_table", "")
+        j_supra   = pair.get("join_supra", "contrato")
+        j_sim     = pair.get("join_simdnit", "NU_CON_FORMATADO")
+        if not supra_t or not simdnit_t:
+            continue
+        if not _check_integrity_table(src_cur, dst_cur, supra_t, simdnit_t, j_supra, j_sim):
+            all_ok = False
+
+    return (0 if all_ok else 1), None, ""
+
+
+def _run_typed_rule(rule_type: str, params: dict) -> "tuple[int, dict | None, str]":
+    """Abre conexões e despacha para o handler genérico correto."""
+    from supra_db_update._paths import runtime_root  # noqa: F401 (já importado localmente)
+    sg     = get_setting("SIMDNIT_SCOPE_SG_UND_GESTORA", default="CGCONT") or "CGCONT"
+    sim_ep = simdnit_endpoint()
+
+    if rule_type == "null_column":
+        with connect_endpoint(sim_ep) as src_conn:
+            cur = src_conn.cursor()
+            try:
+                return _generic_null_column(params, sg, cur)
+            finally:
+                cur.close()
+
+    if rule_type == "arithmetic":
+        with connect_endpoint(sim_ep) as src_conn:
+            cur = src_conn.cursor()
+            try:
+                return _generic_arithmetic(params, sg, cur)
+            finally:
+                cur.close()
+
+    if rule_type == "row_count_per_contract":
+        targets = supra_targets_for_mode(pick_supra_mode())
+        with connect_endpoint(sim_ep) as src_conn:
+            src_cur = src_conn.cursor()
+            try:
+                with connect_endpoint(targets[0]) as dst_conn:
+                    dst_cur = dst_conn.cursor()
+                    try:
+                        return _generic_row_count_per_contract(params, src_cur, dst_cur)
+                    finally:
+                        dst_cur.close()
+            finally:
+                src_cur.close()
+
+    return 1, None, f"ERRO: tipo de regra desconhecido: {rule_type!r}"
+
+
+# ---------------------------------------------------------------------------
 def cmd_run_all() -> int:
     """Executa todas as regras habilitadas em import_rules.json, depois compare --detail.
 
@@ -813,55 +1003,81 @@ def cmd_run_all() -> int:
     import subprocess
     import shlex
 
+    # inclui regras com command (tipo "command") ou com type genérico (null_column, arithmetic…)
     enabled_rules = [
         r for r in rules
-        if r.get("enabled") is not False and r.get("command", "").strip()
+        if r.get("enabled") is not False
+        and (r.get("command", "").strip() or r.get("type", "command") not in ("command", ""))
     ]
     total = len(enabled_rules)
 
     for idx, rule in enumerate(enabled_rules, 1):
         rule_id   = rule.get("id", "rule")
         rule_name = rule.get("name", rule_id)
-        sub_cmd   = rule.get("command", "").strip()
+        rule_type = rule.get("type", "command")
 
         print(f"[Regra {idx}/{total}] {rule_name}...", flush=True)
 
-        try:
-            if getattr(sys, "frozen", False):
-                argv = [sys.executable] + shlex.split(sub_cmd)
-            else:
-                argv = [sys.executable, "-m", "supra_db_update"] + shlex.split(sub_cmd)
-            result = subprocess.run(
-                argv,
-                capture_output=True,
-                text=True,
-                cwd=dir_path,
-            )
-            status  = "ok" if result.returncode == 0 else "erro"
-            raw_out = result.stdout + result.stderr
-            output  = raw_out.strip().replace("\n", "\\n")
-        except Exception as exc:
-            status = "erro"
-            raw_out = str(exc)
-            output = raw_out.replace("\n", "\\n")
+        if rule_type not in ("command", ""):
+            # ── handler genérico inline (sem subprocess) ──────────────────
+            try:
+                exit_code_r, details, text_out = _run_typed_rule(rule_type, rule.get("params", {}))
+                status  = "ok" if exit_code_r == 0 else "erro"
+                raw_out = text_out
+                output  = text_out.strip().replace("\n", "\\n")
+            except Exception as exc:
+                status  = "erro"
+                # preserva erro como details para que apareça no card de alerta
+                details = {"type": rule_type, "error": str(exc)}
+                raw_out = f"ERRO interno na regra ({rule_type}): {exc}"
+                output  = raw_out.replace("\n", "\\n")
 
-        if status != "ok":
-            overall_ok = False
-            # extrai bloco estruturado para a visualização de alertas
-            details = None
-            for line in raw_out.splitlines():
-                if line.startswith("__RULE_DETAILS_JSON__:"):
-                    try:
-                        details = _json.loads(line[len("__RULE_DETAILS_JSON__:"):])
-                    except Exception:
-                        pass
-                    break
-            if details is not None:
-                rule_alerts_for_json.append({
-                    "rule_id":   rule_id,
-                    "rule_name": rule_name,
-                    "details":   details,
-                })
+            if status != "ok":
+                overall_ok = False
+                if details is not None:
+                    rule_alerts_for_json.append({
+                        "rule_id":   rule_id,
+                        "rule_name": rule_name,
+                        "details":   details,
+                    })
+        else:
+            # ── subprocess (comportamento anterior) ───────────────────────
+            sub_cmd = rule.get("command", "").strip()
+            try:
+                if getattr(sys, "frozen", False):
+                    argv = [sys.executable] + shlex.split(sub_cmd)
+                else:
+                    argv = [sys.executable, "-m", "supra_db_update"] + shlex.split(sub_cmd)
+                result = subprocess.run(
+                    argv,
+                    capture_output=True,
+                    text=True,
+                    cwd=dir_path,
+                )
+                status  = "ok" if result.returncode == 0 else "erro"
+                raw_out = result.stdout + result.stderr
+                output  = raw_out.strip().replace("\n", "\\n")
+            except Exception as exc:
+                status  = "erro"
+                raw_out = str(exc)
+                output  = raw_out.replace("\n", "\\n")
+
+            if status != "ok":
+                overall_ok = False
+                details = None
+                for line in raw_out.splitlines():
+                    if line.startswith("__RULE_DETAILS_JSON__:"):
+                        try:
+                            details = _json.loads(line[len("__RULE_DETAILS_JSON__:"):])
+                        except Exception:
+                            pass
+                        break
+                if details is not None:
+                    rule_alerts_for_json.append({
+                        "rule_id":   rule_id,
+                        "rule_name": rule_name,
+                        "details":   details,
+                    })
 
         print(f"RULE:{rule_id}:{status}:{output}", flush=True)
 
